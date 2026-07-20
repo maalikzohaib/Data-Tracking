@@ -26,6 +26,8 @@ model Order {
   paymentMethod  String?  // COD, prepaid, etc.
   itemCount      Int      @default(0)
   cogs           Float    @default(0) // cost of goods (inventory se calculate)
+  shippingAdvance Float   @default(0) // TCS/courier ko hand-paid advance (per order) — manual
+  courier        String?  // TCS, Leopards, M&P, PostEx — manual
   cancelled      Boolean  @default(false)
   shopifyCreatedAt DateTime
   createdAt      DateTime @default(now())
@@ -89,13 +91,17 @@ model InventoryPurchase {
 //  Expenses (manual — inventory, packaging, salaries, misc)
 // ------------------------------------------------------------
 model Expense {
-  id        String   @id @default(cuid())
-  category  String   // Inventory, Packaging, Ads, Shipping, Salary, Misc
-  title     String
-  amount    Float    @default(0) // PKR
-  note      String?
-  spentAt   DateTime @default(now())
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  category   String   // Inventory, Packaging, Shoot/Content, COD Account, Shipping, Salary, Rent, Software, Misc
+  title      String
+  amount     Float    @default(0) // PKR
+  vendor     String?  // kahan se liya / kis ko diya
+  quantity   Float?   // optional (kitne units)
+  unitCost   Float?   // optional (per unit)
+  paidVia    String?  // Cash, Bank, JazzCash, EasyPaisa
+  note       String?
+  spentAt    DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([spentAt])
   @@index([category])
@@ -151,6 +157,22 @@ model CashFlow {
 
   @@index([happenedAt])
   @@index([type])
+}
+
+// ------------------------------------------------------------
+//  Ad Budget — campaign/monthly budget vs actual spend tracking
+// ------------------------------------------------------------
+model AdBudget {
+  id         String   @id @default(cuid())
+  name       String   // campaign name ya "July 2026"
+  platform   String   @default("Meta") // Meta, Google, TikTok
+  amount     Float    @default(0) // allocated budget PKR
+  period     String   @default("monthly") // daily, weekly, monthly, campaign
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
 }
 
 // ------------------------------------------------------------

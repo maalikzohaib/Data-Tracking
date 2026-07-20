@@ -8,8 +8,20 @@
 
 html,
 body {
-  background: #0a0e1a;
-  color: #e6e9f0;
+  background: #0b0f10;
+  color: #e8efec;
+}
+
+/* Subtle ambient background glow — premium, not loud */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60rem 40rem at 15% -10%, rgba(16, 185, 129, 0.07), transparent 60%),
+    radial-gradient(50rem 40rem at 100% 0%, rgba(245, 196, 81, 0.05), transparent 55%);
+  pointer-events: none;
 }
 
 /* Custom scrollbar */
@@ -18,15 +30,15 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0e1a;
+  background: #0b0f10;
 }
 ::-webkit-scrollbar-thumb {
-  background: #232b41;
+  background: #232e31;
   border-radius: 8px;
-  border: 2px solid #0a0e1a;
+  border: 2px solid #0b0f10;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2f3a56;
+  background: #2f3d40;
 }
 
 @layer components {
@@ -37,12 +49,12 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition;
   }
   .btn-primary {
-    @apply btn text-white;
-    background-image: linear-gradient(135deg, #6366f1, #4f46e5);
+    @apply btn text-black font-semibold;
+    background-image: linear-gradient(135deg, #34d399, #10b981);
   }
   .btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
   }
   .btn-ghost {
     @apply btn bg-panel2 border border-border text-text hover:border-brand;
@@ -50,9 +62,12 @@ body {
   .input {
     @apply w-full rounded-xl bg-panel2 border border-border px-3 py-2 text-sm text-text outline-none transition;
   }
+  .input::placeholder {
+    @apply text-muted/60;
+  }
   .input:focus {
     @apply border-brand;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
   }
   .label {
     @apply block text-xs font-medium text-muted mb-1.5;

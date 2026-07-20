@@ -40,7 +40,7 @@ type StatsResponse = {
   breakdown: { name: string; value: number }[];
 };
 
-const PIE_COLORS = ["#6366f1", "#22d3ee", "#f87171", "#fbbf24", "#34d399", "#a78bfa", "#fb923c"];
+const PIE_COLORS = ["#10b981", "#f5c451", "#f87171", "#fbbf24", "#34d399", "#5eead4", "#fb923c"];
 
 export default function DashboardPage() {
   const [range, setRange] = useState("30d");
@@ -138,15 +138,15 @@ export default function DashboardPage() {
                   <AreaChart data={data.series}>
                     <defs>
                       <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.5} />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="prof" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#34d399" stopOpacity={0.5} />
                         <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#232b41" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#232e31" />
                     <XAxis dataKey="date" stroke="#8b95ad" fontSize={11} tickFormatter={(d) => d.slice(5)} />
                     <YAxis stroke="#8b95ad" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
                     <Tooltip
@@ -154,7 +154,7 @@ export default function DashboardPage() {
                       formatter={(v: number) => fmtPKR(v)}
                     />
                     <Legend />
-                    <Area type="monotone" dataKey="revenue" stroke="#6366f1" fill="url(#rev)" strokeWidth={2} name="Revenue" />
+                    <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#rev)" strokeWidth={2} name="Revenue" />
                     <Area type="monotone" dataKey="profit" stroke="#34d399" fill="url(#prof)" strokeWidth={2} name="Profit" />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -194,11 +194,11 @@ export default function DashboardPage() {
             {data?.series.length ? (
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={data.series}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#232b41" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#232e31" />
                   <XAxis dataKey="date" stroke="#8b95ad" fontSize={11} tickFormatter={(d) => d.slice(5)} />
                   <YAxis stroke="#8b95ad" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtPKR(v)} cursor={{ fill: "#232b4155" }} />
-                  <Bar dataKey="adSpend" fill="#22d3ee" radius={[6, 6, 0, 0]} name="Ad Spend" />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtPKR(v)} cursor={{ fill: "#232e3155" }} />
+                  <Bar dataKey="adSpend" fill="#f5c451" radius={[6, 6, 0, 0]} name="Ad Spend" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -213,7 +213,7 @@ export default function DashboardPage() {
 
 const tooltipStyle = {
   background: "#111726",
-  border: "1px solid #232b41",
+  border: "1px solid #232e31",
   borderRadius: 12,
   color: "#e6e9f0",
   fontSize: 12,

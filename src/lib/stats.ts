@@ -24,6 +24,7 @@ export type Overview = {
   adSpend: number;
   codCharges: number;
   shipping: number;
+  shippingAdvance: number;
   otherExpenses: number;
   grossProfit: number;
   netProfit: number;
@@ -47,7 +48,7 @@ export async function getOverview(range: Range): Promise<Overview> {
           cancelled: false,
           ...(dateFilter ? { shopifyCreatedAt: dateFilter } : {}),
         },
-        select: { totalPrice: true, cogs: true, totalShipping: true },
+        select: { totalPrice: true, cogs: true, totalShipping: true, shippingAdvance: true },
       }),
       prisma.metaAdDaily.aggregate({
         _sum: { spend: true, revenue: true },
@@ -77,6 +78,7 @@ export async function getOverview(range: Range): Promise<Overview> {
   const revenue = sum(orders.map((o) => o.totalPrice));
   const cogs = sum(orders.map((o) => o.cogs));
   const shipping = sum(orders.map((o) => o.totalShipping));
+  const shippingAdvance = sum(orders.map((o) => o.shippingAdvance));
   const orderCount = orders.length;
   const adSpend = adAgg._sum.spend ?? 0;
   const codCharges = codAgg._sum.amount ?? 0;
@@ -86,7 +88,7 @@ export async function getOverview(range: Range): Promise<Overview> {
 
   const grossProfit = revenue - cogs;
   const netProfit =
-    revenue - cogs - adSpend - codCharges - otherExpenses;
+    revenue - cogs - adSpend - codCharges - shippingAdvance - otherExpenses;
 
   const inventoryValue = sum(products.map((p) => p.stock * p.buyPrice));
   const lowStockCount = products.filter(
@@ -106,6 +108,7 @@ export async function getOverview(range: Range): Promise<Overview> {
     adSpend,
     codCharges,
     shipping,
+    shippingAdvance,
     otherExpenses,
     grossProfit,
     netProfit,
@@ -187,7 +190,7 @@ export async function getExpenseBreakdown(range: Range) {
       where: dateFilter ? { chargedAt: dateFilter } : {},
     }),
     prisma.order.aggregate({
-      _sum: { cogs: true },
+      _sum: { cogs: true, shippingAdvance: true },
       where: {
         cancelled: false,
         ...(dateFilter ? { shopifyCreatedAt: dateFilter } : {}),
@@ -203,6 +206,7 @@ export async function getExpenseBreakdown(range: Range) {
   push("COGS (Inventory)", orders._sum.cogs ?? 0);
   push("Meta Ads", adAgg._sum.spend ?? 0);
   push("COD Charges", codAgg._sum.amount ?? 0);
+  push("Shipping Advance", orders._sum.shippingAdvance ?? 0);
   for (const e of expenses) {
     if (e.category !== "Ads") push(e.category, e._sum.amount ?? 0);
   }

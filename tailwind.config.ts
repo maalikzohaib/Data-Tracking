@@ -7,27 +7,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#0a0e1a",
-        panel: "#111726",
-        panel2: "#161d30",
-        border: "#232b41",
-        muted: "#8b95ad",
-        text: "#e6e9f0",
+        bg: "#0b0f10",
+        panel: "#12181a",
+        panel2: "#171f22",
+        border: "#232e31",
+        muted: "#7d8f92",
+        text: "#e8efec",
         brand: {
-          DEFAULT: "#6366f1",
-          light: "#818cf8",
+          DEFAULT: "#10b981",
+          light: "#34d399",
+          dark: "#059669",
         },
-        accent: "#22d3ee",
+        accent: "#f5c451",
         good: "#34d399",
         bad: "#f87171",
         warn: "#fbbf24",
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
+        sans: ["var(--font-body)", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-body)", "sans-serif"],
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(99,102,241,0.25), 0 8px 30px rgba(99,102,241,0.15)",
-        card: "0 4px 24px rgba(0,0,0,0.35)",
+        glow: "0 0 0 1px rgba(16,185,129,0.2), 0 8px 30px rgba(16,185,129,0.12)",
+        card: "0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 30px rgba(0,0,0,0.4)",
+      },
+      backgroundImage: {
+        "grid-fade":
+          "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)",
       },
     },
   },

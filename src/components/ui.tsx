@@ -15,8 +15,8 @@ export function PageHeader({
     <div className="flex flex-wrap items-end justify-between gap-3 mb-6 pt-14 lg:pt-0">
       <div>
         <h1
-          className="text-2xl font-bold bg-clip-text text-transparent"
-          style={{ backgroundImage: "linear-gradient(135deg, #e6e9f0, #818cf8)" }}
+          className="text-2xl font-display font-bold bg-clip-text text-transparent"
+          style={{ backgroundImage: "linear-gradient(135deg, #e8efec, #34d399)" }}
         >
           {title}
         </h1>
@@ -41,22 +41,22 @@ export function StatCard({
   tone?: "brand" | "good" | "bad" | "warn" | "accent";
 }) {
   const tones: Record<string, string> = {
-    brand: "linear-gradient(135deg, #6366f1, #4f46e5)",
+    brand: "linear-gradient(135deg, #10b981, #059669)",
     good: "linear-gradient(135deg, #34d399, #059669)",
     bad: "linear-gradient(135deg, #f87171, #dc2626)",
-    warn: "linear-gradient(135deg, #fbbf24, #d97706)",
-    accent: "linear-gradient(135deg, #22d3ee, #0891b2)",
+    warn: "linear-gradient(135deg, #f5c451, #d97706)",
+    accent: "linear-gradient(135deg, #f5c451, #e0a92e)",
   };
   return (
     <div className="card p-5 relative overflow-hidden group hover:-translate-y-0.5 transition">
       <div
-        className="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-10 blur-2xl"
+        className="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-[0.12] blur-2xl"
         style={{ backgroundImage: tones[tone] }}
       />
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-xs text-muted">{label}</div>
-          <div className="text-2xl font-bold mt-1">{value}</div>
+          <div className="text-xs text-muted uppercase tracking-wide">{label}</div>
+          <div className="text-2xl font-display font-bold mt-1.5 tabular-nums">{value}</div>
           {sub && <div className="text-xs text-muted mt-1">{sub}</div>}
         </div>
         <div
@@ -133,7 +133,7 @@ export function RangeTabs({
           }`}
           style={
             value === o.v
-              ? { backgroundImage: "linear-gradient(135deg, #6366f1, #4f46e5)" }
+              ? { backgroundImage: "linear-gradient(135deg, #10b981, #059669)" }
               : undefined
           }
         >

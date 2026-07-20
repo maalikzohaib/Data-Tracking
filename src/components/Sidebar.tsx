@@ -61,13 +61,13 @@ export default function Sidebar() {
         ${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
         style={{
           backgroundImage:
-            "linear-gradient(180deg, #0d1424 0%, #0a0e1a 100%)",
+            "linear-gradient(180deg, #0f1719 0%, #0b0f10 100%)",
         }}
       >
         <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
           <LogoMark />
           <div>
-            <div className="font-semibold leading-tight">Business Tracker</div>
+            <div className="font-display font-semibold leading-tight tracking-tight">Business Tracker</div>
             <div className="text-[11px] text-muted">Shopify · Meta · PKR</div>
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function Sidebar() {
                         active
                           ? {
                               backgroundImage:
-                                "linear-gradient(135deg, #6366f1, #4f46e5)",
+                                "linear-gradient(135deg, #10b981, #059669)",
                             }
                           : undefined
                       }
@@ -112,7 +112,7 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-border text-[11px] text-muted">
-          Auto-sync every hour · v1.0
+          Manual sync · Settings se · v1.0
         </div>
       </aside>
 
@@ -129,8 +129,8 @@ export default function Sidebar() {
 function LogoMark() {
   return (
     <div
-      className="h-9 w-9 rounded-xl flex items-center justify-center text-white font-bold shadow-glow"
-      style={{ backgroundImage: "linear-gradient(135deg, #6366f1, #22d3ee)" }}
+      className="h-9 w-9 rounded-xl flex items-center justify-center text-white font-bold shadow-glow font-display"
+      style={{ backgroundImage: "linear-gradient(135deg, #10b981, #f5c451)" }}
     >
       B
     </div>

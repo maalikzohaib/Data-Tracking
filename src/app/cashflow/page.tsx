@@ -75,15 +75,15 @@ export default function CashflowPage() {
             <AreaChart data={chart}>
               <defs>
                 <linearGradient id="bal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#f5c451" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="#f5c451" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#232b41" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#232e31" />
               <XAxis dataKey="date" stroke="#8b95ad" fontSize={11} />
               <YAxis stroke="#8b95ad" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtPKR(v)} />
-              <Area type="monotone" dataKey="balance" stroke="#22d3ee" fill="url(#bal)" strokeWidth={2} />
+              <Area type="monotone" dataKey="balance" stroke="#f5c451" fill="url(#bal)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
@@ -162,7 +162,7 @@ export default function CashflowPage() {
 
 const tooltipStyle = {
   background: "#111726",
-  border: "1px solid #232b41",
+  border: "1px solid #232e31",
   borderRadius: 12,
   color: "#e6e9f0",
   fontSize: 12,
