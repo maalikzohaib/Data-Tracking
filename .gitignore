@@ -30,6 +30,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# temp / scratch files (secrets, scripts)
+_*.txt
+_*.json
+_*.mjs
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
