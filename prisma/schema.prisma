@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+//  Orders (Shopify se auto-sync + webhook)
+// ------------------------------------------------------------
+model Order {
+  id             String   @id @default(cuid())
+  shopifyId      String   @unique
+  orderNumber    String?
+  customerName   String?
+  customerCity   String?
+  totalPrice     Float    @default(0) // PKR
+  subtotalPrice  Float    @default(0)
+  totalDiscount  Float    @default(0)
+  totalShipping  Float    @default(0)
+  currency       String   @default("PKR")
+  financialStatus   String? // paid, pending, refunded
+  fulfillmentStatus String? // fulfilled, unfulfilled, partial
+  paymentMethod  String?  // COD, prepaid, etc.
+  itemCount      Int      @default(0)
+  cogs           Float    @default(0) // cost of goods (inventory se calculate)
+  cancelled      Boolean  @default(false)
+  shopifyCreatedAt DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lineItems      OrderLineItem[]
+
+  @@index([shopifyCreatedAt])
+  @@index([financialStatus])
+}
+
+model OrderLineItem {
+  id         String  @id @default(cuid())
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  title      String
+  sku        String?
+  quantity   Int     @default(1)
+  price      Float   @default(0)
+  productId  String?
+
+  @@index([orderId])
+}
+
+// ------------------------------------------------------------
+//  Inventory / Products (Shopify se sync + manual buy price)
+// ------------------------------------------------------------
+model Product {
+  id            String   @id @default(cuid())
+  shopifyId     String?  @unique
+  title         String
+  sku           String?  @unique
+  buyPrice      Float    @default(0) // per unit cost (COGS ke liye) — manual
+  sellPrice     Float    @default(0)
+  stock         Int      @default(0)
+  lowStockAlert Int      @default(5)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  purchases     InventoryPurchase[]
+
+  @@index([sku])
+}
+
+// Inventory buy karne ka record (cash on inventory ke liye)
+model InventoryPurchase {
+  id          String   @id @default(cuid())
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId   String?
+  title       String
+  quantity    Int      @default(0)
+  unitCost    Float    @default(0)
+  totalCost   Float    @default(0) // PKR
+  supplier    String?
+  note        String?
+  purchasedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([purchasedAt])
+}
+
+// ------------------------------------------------------------
+//  Expenses (manual — inventory, packaging, salaries, misc)
+// ------------------------------------------------------------
+model Expense {
+  id        String   @id @default(cuid())
+  category  String   // Inventory, Packaging, Ads, Shipping, Salary, Misc
+  title     String
+  amount    Float    @default(0) // PKR
+  note      String?
+  spentAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([spentAt])
+  @@index([category])
+}
+
+// ------------------------------------------------------------
+//  Meta (Facebook) Ads — daily insights (auto-sync)
+// ------------------------------------------------------------
+model MetaAdDaily {
+  id          String   @id @default(cuid())
+  date        DateTime @unique // ek din ka aggregate
+  spend       Float    @default(0) // PKR
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  purchases   Int      @default(0)
+  revenue     Float    @default(0) // conversion value (agar available ho)
+  reach       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+}
+
+// ------------------------------------------------------------
+//  COD Charges (courier-wise — manual ya import)
+// ------------------------------------------------------------
+model CodCharge {
+  id          String   @id @default(cuid())
+  courier     String   // TCS, Leopards, M&P, PostEx, etc.
+  orderRef    String?
+  amount      Float    @default(0) // COD service charge PKR
+  codCollected Float   @default(0) // customer se collect hui raqam
+  status      String   @default("pending") // pending, delivered, returned
+  chargedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([chargedAt])
+  @@index([courier])
+}
+
+// ------------------------------------------------------------
+//  Cash Flow — cash in / cash out ledger (auto + manual)
+// ------------------------------------------------------------
+model CashFlow {
+  id        String   @id @default(cuid())
+  type      String   // in | out
+  source    String   // Sales, Inventory, Ads, COD, Expense, Manual
+  amount    Float    @default(0) // PKR
+  note      String?
+  refId     String?  // linked order/expense id
+  happenedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([happenedAt])
+  @@index([type])
+}
+
+// ------------------------------------------------------------
+//  Sync log — har sync ka record (debugging ke liye)
+// ------------------------------------------------------------
+model SyncLog {
+  id        String   @id @default(cuid())
+  source    String   // shopify, meta
+  status    String   // success, error
+  message   String?
+  count     Int      @default(0)
+  ranAt     DateTime @default(now())
+
+  @@index([ranAt])
+}

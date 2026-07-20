@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0a0e1a;
+  color: #e6e9f0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0e1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #232b41;
+  border-radius: 8px;
+  border: 2px solid #0a0e1a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2f3a56;
+}
+
+@layer components {
+  .card {
+    @apply bg-panel border border-border rounded-2xl shadow-card;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition;
+  }
+  .btn-primary {
+    @apply btn text-white;
+    background-image: linear-gradient(135deg, #6366f1, #4f46e5);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+  }
+  .btn-ghost {
+    @apply btn bg-panel2 border border-border text-text hover:border-brand;
+  }
+  .input {
+    @apply w-full rounded-xl bg-panel2 border border-border px-3 py-2 text-sm text-text outline-none transition;
+  }
+  .input:focus {
+    @apply border-brand;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  }
+  .label {
+    @apply block text-xs font-medium text-muted mb-1.5;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+}
