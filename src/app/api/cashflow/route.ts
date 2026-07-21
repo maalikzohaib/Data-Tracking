@@ -49,3 +49,29 @@ export async function POST(req: Request) {
   });
   return NextResponse.json({ flow });
 }
+
+// Sirf manual entries delete ho sakti hain. Auto-linked (Sales, Ads, Shipping,
+// Expense, Loan, COD) wale unke apne source module se delete/edit hote hain —
+// yahan se hata do to wo dobara sync par wapas aa jayenge.
+const AUTO_SOURCES = ["Sales", "Ads", "Shipping", "Expense", "Loan", "Loan Repayment", "COD"];
+
+export async function DELETE(req: Request) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const flow = await prisma.cashFlow.findUnique({ where: { id } });
+  if (!flow) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (flow.refId || AUTO_SOURCES.includes(flow.source)) {
+    return NextResponse.json(
+      {
+        error:
+          "Ye auto-linked entry hai (order/ads/loan/expense se aayi). Isko uske apne page se hata/edit karo.",
+      },
+      { status: 400 }
+    );
+  }
+
+  await prisma.cashFlow.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}

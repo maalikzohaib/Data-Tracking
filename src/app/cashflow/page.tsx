@@ -20,9 +20,12 @@ type Flow = {
   source: string;
   amount: number;
   note: string | null;
+  refId: string | null;
   happenedAt: string;
   balance: number;
 };
+
+const AUTO_SOURCES = ["Sales", "Ads", "Shipping", "Expense", "Loan", "Loan Repayment", "COD"];
 
 type Loan = {
   id: string;
@@ -99,6 +102,11 @@ export default function CashflowPage() {
   async function delLoan(id: string) {
     await apiSend(`/api/loans?id=${id}`, "DELETE");
     await Promise.all([load(), loadLoans()]);
+  }
+
+  async function delFlow(id: string) {
+    await apiSend(`/api/cashflow?id=${id}`, "DELETE");
+    await load();
   }
 
   const cashIn = flows.filter((f) => f.type === "in").reduce((s, f) => s + f.amount, 0);
@@ -298,21 +306,36 @@ export default function CashflowPage() {
                     <th className="py-3 px-2 text-right">Out</th>
                     <th className="py-3 px-2 text-right">Balance</th>
                     <th className="py-3 px-2 text-right">Date</th>
+                    <th className="py-3 px-2"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {flows.map((f) => (
-                    <tr key={f.id} className="border-b border-border/50 hover:bg-panel2/50">
-                      <td className="py-3 px-2">
-                        <span className="pill bg-panel2 text-muted">{f.source}</span>
-                      </td>
-                      <td className="py-3 px-2 text-muted">{f.note || "—"}</td>
-                      <td className="py-3 px-2 text-right text-good">{f.type === "in" ? fmtPKR(f.amount) : "—"}</td>
-                      <td className="py-3 px-2 text-right text-bad">{f.type === "out" ? fmtPKR(f.amount) : "—"}</td>
-                      <td className="py-3 px-2 text-right font-semibold">{fmtPKR(f.balance)}</td>
-                      <td className="py-3 px-2 text-right text-muted">{fmtDate(f.happenedAt)}</td>
-                    </tr>
-                  ))}
+                  {flows.map((f) => {
+                    const isManual = !f.refId && !AUTO_SOURCES.includes(f.source);
+                    return (
+                      <tr key={f.id} className="border-b border-border/50 hover:bg-panel2/50">
+                        <td className="py-3 px-2">
+                          <span className="pill bg-panel2 text-muted">{f.source}</span>
+                        </td>
+                        <td className="py-3 px-2 text-muted">{f.note || "—"}</td>
+                        <td className="py-3 px-2 text-right text-good">{f.type === "in" ? fmtPKR(f.amount) : "—"}</td>
+                        <td className="py-3 px-2 text-right text-bad">{f.type === "out" ? fmtPKR(f.amount) : "—"}</td>
+                        <td className="py-3 px-2 text-right font-semibold">{fmtPKR(f.balance)}</td>
+                        <td className="py-3 px-2 text-right text-muted">{fmtDate(f.happenedAt)}</td>
+                        <td className="py-3 px-2 text-right">
+                          {isManual ? (
+                            <button className="text-bad hover:underline text-xs" onClick={() => delFlow(f.id)}>
+                              Delete
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-muted/60" title="Auto-linked — apne page se edit karo">
+                              auto
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
