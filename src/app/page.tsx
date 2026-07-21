@@ -53,17 +53,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/stats?range=${range}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.error) setError(d.hint || d.error);
-        else {
-          setData(d);
-          setError(null);
-        }
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
+    // Pehli baar Meta se fresh ad data kheech lo (background), phir stats load.
+    fetch("/api/meta/sync", { method: "POST" })
+      .catch(() => {})
+      .finally(() => {
+        fetch(`/api/stats?range=${range}`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.error) setError(d.hint || d.error);
+            else {
+              setData(d);
+              setError(null);
+            }
+          })
+          .catch((e) => setError(String(e)))
+          .finally(() => setLoading(false));
+      });
   }, [range]);
 
   const o = data?.overview;

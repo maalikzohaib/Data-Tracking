@@ -75,9 +75,38 @@ export default function MetaPage() {
     });
 
   useEffect(() => {
-    loadMeta().finally(() => setLoading(false));
-    loadBudgets();
+    // Page khulte hi pehle Meta se fresh data kheech lo, phir dikhao.
+    (async () => {
+      try {
+        await fetch("/api/meta/sync", { method: "POST" });
+      } catch {
+        // agar sync fail ho to jo DB mein hai wahi dikha do
+      }
+      await Promise.all([loadMeta(), loadBudgets()]);
+      setLoading(false);
+    })();
   }, []);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
+
+  async function refreshMeta() {
+    setRefreshing(true);
+    setRefreshMsg(null);
+    try {
+      const res = await fetch("/api/meta/sync", { method: "POST" });
+      const j = await res.json();
+      if (j.ok) {
+        setRefreshMsg(`✅ ${j.days} din ka data Meta se aa gaya`);
+        await Promise.all([loadMeta(), loadBudgets()]);
+      } else {
+        setRefreshMsg(`❌ ${String(j.error).slice(0, 120)}`);
+      }
+    } catch (e) {
+      setRefreshMsg(`❌ ${String(e)}`);
+    }
+    setRefreshing(false);
+  }
 
   async function addSpend() {
     if (!sform.date || !sform.spend) return;
@@ -132,7 +161,24 @@ export default function MetaPage() {
 
   return (
     <>
-      <PageHeader title="Meta Ads" subtitle="Facebook / Instagram ads — daily & weekly (auto-synced)" />
+      <PageHeader
+        title="Meta Ads"
+        subtitle="Facebook / Instagram ads — Meta se live fetch hota hai"
+        action={
+          <div className="flex items-center gap-3">
+            {refreshMsg && <span className="text-xs text-muted">{refreshMsg}</span>}
+            <button className="btn-primary" onClick={refreshMeta} disabled={refreshing}>
+              {refreshing ? "Fetching…" : "🔄 Refresh from Meta"}
+            </button>
+          </div>
+        }
+      />
+
+      {loading && (
+        <div className="card p-3 mb-4 text-sm text-muted">
+          Meta se latest data laa rahe hain…
+        </div>
+      )}
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Spend" value={fmtPKR(totalSpend)} icon="📣" tone="accent" />
