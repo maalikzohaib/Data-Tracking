@@ -97,10 +97,13 @@ export function Card({
 export function Pill({ status }: { status: string }) {
   const map: Record<string, string> = {
     paid: "bg-good/15 text-good",
+    completed: "bg-good/15 text-good",
     delivered: "bg-good/15 text-good",
+    fulfilled: "bg-good/15 text-good",
+    shipped: "bg-brand/15 text-brand-light",
+    processing: "bg-warn/15 text-warn",
     pending: "bg-warn/15 text-warn",
     unfulfilled: "bg-warn/15 text-warn",
-    fulfilled: "bg-good/15 text-good",
     returned: "bg-bad/15 text-bad",
     refunded: "bg-bad/15 text-bad",
     cancelled: "bg-bad/15 text-bad",

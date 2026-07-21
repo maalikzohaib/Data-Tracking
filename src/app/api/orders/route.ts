@@ -15,56 +15,211 @@ export async function GET(req: Request) {
   return NextResponse.json({ orders });
 }
 
-const patchSchema = z.object({
-  id: z.string().min(1),
+// ------------------------------------------------------------
+//  Manual order create
+// ------------------------------------------------------------
+const createSchema = z.object({
+  customerName: z.string().min(1),
+  customerCity: z.string().optional(),
+  totalPrice: z.number().nonnegative(), // sell price
+  cogs: z.number().nonnegative().optional(), // cost
+  stage: z.enum(["processing", "shipped", "completed", "cancelled"]).default("processing"),
   shippingAdvance: z.number().nonnegative().optional(),
   courier: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  itemCount: z.number().int().positive().optional(),
+  note: z.string().optional(),
+  happenedAt: z.string().optional(),
 });
 
-// Manual per-order fields: courier ka naam + hand-paid shipping advance.
+// Stage se financial status derive karo.
+function stageToFinancial(stage: string): { financialStatus: string; cancelled: boolean } {
+  if (stage === "completed") return { financialStatus: "paid", cancelled: false };
+  if (stage === "cancelled") return { financialStatus: "cancelled", cancelled: true };
+  return { financialStatus: "pending", cancelled: false };
+}
+
+// Order ke cash flows (Sales in + Shipping out) ko current stage ke hisaab se sync karo.
+async function syncOrderCash(order: {
+  id: string;
+  orderNumber: string | null;
+  totalPrice: number;
+  shippingAdvance: number;
+  stage: string | null;
+  happenedAt: Date;
+}) {
+  const label = order.orderNumber ?? order.id;
+
+  // Sales cash-in: sirf completed order pe.
+  const saleExisting = await prisma.cashFlow.findFirst({
+    where: { refId: order.id, source: "Sales" },
+  });
+  if (order.stage === "completed" && order.totalPrice > 0) {
+    if (saleExisting) {
+      await prisma.cashFlow.update({
+        where: { id: saleExisting.id },
+        data: { amount: order.totalPrice, happenedAt: order.happenedAt },
+      });
+    } else {
+      await prisma.cashFlow.create({
+        data: {
+          type: "in",
+          source: "Sales",
+          amount: order.totalPrice,
+          note: `Order ${label}`,
+          refId: order.id,
+          happenedAt: order.happenedAt,
+        },
+      });
+    }
+  } else if (saleExisting) {
+    // processing/cancelled hua to sale cash-in hata do.
+    await prisma.cashFlow.delete({ where: { id: saleExisting.id } });
+  }
+
+  // Shipping advance cash-out (jab bhi > 0).
+  const shipExisting = await prisma.cashFlow.findFirst({
+    where: { refId: order.id, source: "Shipping" },
+  });
+  if (order.shippingAdvance > 0) {
+    if (shipExisting) {
+      await prisma.cashFlow.update({
+        where: { id: shipExisting.id },
+        data: { amount: order.shippingAdvance },
+      });
+    } else {
+      await prisma.cashFlow.create({
+        data: {
+          type: "out",
+          source: "Shipping",
+          amount: order.shippingAdvance,
+          note: `Shipping advance — ${label}`,
+          refId: order.id,
+          happenedAt: order.happenedAt,
+        },
+      });
+    }
+  } else if (shipExisting) {
+    await prisma.cashFlow.delete({ where: { id: shipExisting.id } });
+  }
+}
+
+export async function POST(req: Request) {
+  const body = await req.json();
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  const d = parsed.data;
+  const when = d.happenedAt ? new Date(d.happenedAt) : new Date();
+  const { financialStatus, cancelled } = stageToFinancial(d.stage);
+
+  // Manual order number: MAN-<count+1>
+  const manualCount = await prisma.order.count({ where: { source: "manual" } });
+  const orderNumber = `MAN-${String(manualCount + 1).padStart(4, "0")}`;
+
+  const order = await prisma.order.create({
+    data: {
+      source: "manual",
+      orderNumber,
+      customerName: d.customerName,
+      customerCity: d.customerCity,
+      totalPrice: d.totalPrice,
+      subtotalPrice: d.totalPrice,
+      cogs: d.cogs ?? 0,
+      stage: d.stage,
+      financialStatus,
+      fulfillmentStatus: d.stage === "completed" ? "fulfilled" : "unfulfilled",
+      paymentMethod: d.paymentMethod ?? "COD",
+      itemCount: d.itemCount ?? 1,
+      shippingAdvance: d.shippingAdvance ?? 0,
+      courier: d.courier,
+      cancelled,
+      shopifyCreatedAt: when,
+    },
+  });
+
+  await syncOrderCash({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    totalPrice: order.totalPrice,
+    shippingAdvance: order.shippingAdvance,
+    stage: order.stage,
+    happenedAt: when,
+  });
+
+  return NextResponse.json({ order });
+}
+
+// ------------------------------------------------------------
+//  Update order (stage / shipping advance / courier / prices)
+// ------------------------------------------------------------
+const patchSchema = z.object({
+  id: z.string().min(1),
+  stage: z.enum(["processing", "shipped", "completed", "cancelled"]).optional(),
+  shippingAdvance: z.number().nonnegative().optional(),
+  courier: z.string().optional(),
+  totalPrice: z.number().nonnegative().optional(),
+  cogs: z.number().nonnegative().optional(),
+});
+
 export async function PATCH(req: Request) {
   const body = await req.json();
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { id, shippingAdvance, courier } = parsed.data;
+  const { id, stage, shippingAdvance, courier, totalPrice, cogs } = parsed.data;
+
+  const stageData = stage
+    ? {
+        stage,
+        ...stageToFinancial(stage),
+        fulfillmentStatus: stage === "completed" ? "fulfilled" : "unfulfilled",
+      }
+    : {};
 
   const order = await prisma.order.update({
     where: { id },
     data: {
+      ...stageData,
       ...(shippingAdvance !== undefined ? { shippingAdvance } : {}),
       ...(courier !== undefined ? { courier } : {}),
+      ...(totalPrice !== undefined ? { totalPrice } : {}),
+      ...(cogs !== undefined ? { cogs } : {}),
     },
   });
 
-  // Shipping advance ko cash-out ledger mein sync rakho (dedup by refId+source).
-  if (shippingAdvance !== undefined) {
-    const existing = await prisma.cashFlow.findFirst({
-      where: { refId: id, source: "Shipping" },
-    });
-    if (shippingAdvance > 0) {
-      if (existing) {
-        await prisma.cashFlow.update({
-          where: { id: existing.id },
-          data: { amount: shippingAdvance, note: `Shipping advance — ${order.orderNumber ?? id}` },
-        });
-      } else {
-        await prisma.cashFlow.create({
-          data: {
-            type: "out",
-            source: "Shipping",
-            amount: shippingAdvance,
-            note: `Shipping advance — ${order.orderNumber ?? id}`,
-            refId: id,
-            happenedAt: new Date(),
-          },
-        });
-      }
-    } else if (existing) {
-      await prisma.cashFlow.delete({ where: { id: existing.id } });
-    }
-  }
+  await syncOrderCash({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    totalPrice: order.totalPrice,
+    shippingAdvance: order.shippingAdvance,
+    stage: order.stage,
+    happenedAt: order.shopifyCreatedAt,
+  });
 
   return NextResponse.json({ order });
+}
+
+// ------------------------------------------------------------
+//  Delete (manual orders only) — cash flows bhi hata do
+// ------------------------------------------------------------
+export async function DELETE(req: Request) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (order.source !== "manual") {
+    return NextResponse.json(
+      { error: "Sirf manual orders delete ho sakte hain" },
+      { status: 400 }
+    );
+  }
+
+  await prisma.cashFlow.deleteMany({ where: { refId: id } });
+  await prisma.order.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
 }

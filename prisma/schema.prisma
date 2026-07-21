@@ -12,21 +12,23 @@ datasource db {
 // ------------------------------------------------------------
 model Order {
   id             String   @id @default(cuid())
-  shopifyId      String   @unique
+  shopifyId      String?  @unique // manual orders ke liye null
+  source         String   @default("shopify") // shopify | manual
   orderNumber    String?
   customerName   String?
   customerCity   String?
-  totalPrice     Float    @default(0) // PKR
+  totalPrice     Float    @default(0) // sell price (PKR)
   subtotalPrice  Float    @default(0)
   totalDiscount  Float    @default(0)
   totalShipping  Float    @default(0)
   currency       String   @default("PKR")
   financialStatus   String? // paid, pending, refunded
   fulfillmentStatus String? // fulfilled, unfulfilled, partial
+  stage          String?  // manual: processing | shipped | completed | cancelled
   paymentMethod  String?  // COD, prepaid, etc.
   itemCount      Int      @default(0)
-  cogs           Float    @default(0) // cost of goods (inventory se calculate)
-  shippingAdvance Float   @default(0) // TCS/courier ko hand-paid advance (per order) — manual
+  cogs           Float    @default(0) // cost of goods (manual: khud enter, shopify: SKU se)
+  shippingAdvance Float   @default(0) // courier ko hand-paid advance (per order) — manual
   courier        String?  // TCS, Leopards, M&P, PostEx — manual
   cancelled      Boolean  @default(false)
   shopifyCreatedAt DateTime
@@ -36,6 +38,7 @@ model Order {
 
   @@index([shopifyCreatedAt])
   @@index([financialStatus])
+  @@index([source])
 }
 
 model OrderLineItem {
@@ -173,6 +176,23 @@ model AdBudget {
   updatedAt  DateTime @updatedAt
 
   @@index([createdAt])
+}
+
+// ------------------------------------------------------------
+//  Loan / Borrow — udhaar liya paisa (bank loan, dost se udhaar)
+//  Cash-in ledger mein aata hai; repayment cash-out.
+// ------------------------------------------------------------
+model Loan {
+  id          String   @id @default(cuid())
+  lender      String   // Bank, dost ka naam, etc.
+  principal   Float    @default(0) // kitna liya (PKR)
+  repaid      Float    @default(0) // kitna wapas kiya (PKR)
+  note        String?
+  borrowedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([borrowedAt])
 }
 
 // ------------------------------------------------------------

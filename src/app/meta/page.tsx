@@ -58,6 +58,9 @@ export default function MetaPage() {
   const [bsum, setBsum] = useState<BudgetSummary | null>(null);
   const [bform, setBform] = useState({ name: "", amount: "", period: "monthly", note: "" });
   const [bsaving, setBsaving] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const [sform, setSform] = useState({ date: today, spend: "", revenue: "", purchases: "" });
+  const [ssaving, setSsaving] = useState(false);
 
   const loadBudgets = () =>
     apiGet<{ budgets: Budget[]; summary: BudgetSummary }>("/api/adbudget").then((d) => {
@@ -65,15 +68,35 @@ export default function MetaPage() {
       setBsum(d.summary);
     });
 
+  const loadMeta = () =>
+    apiGet<{ daily: Daily[]; weekly: Weekly[] }>("/api/meta?days=90").then((d) => {
+      setDaily(d.daily || []);
+      setWeekly(d.weekly || []);
+    });
+
   useEffect(() => {
-    apiGet<{ daily: Daily[]; weekly: Weekly[] }>("/api/meta?days=90")
-      .then((d) => {
-        setDaily(d.daily || []);
-        setWeekly(d.weekly || []);
-      })
-      .finally(() => setLoading(false));
+    loadMeta().finally(() => setLoading(false));
     loadBudgets();
   }, []);
+
+  async function addSpend() {
+    if (!sform.date || !sform.spend) return;
+    setSsaving(true);
+    await apiSend("/api/meta", "POST", {
+      date: sform.date,
+      spend: parseFloat(sform.spend),
+      ...(sform.revenue ? { revenue: parseFloat(sform.revenue) } : {}),
+      ...(sform.purchases ? { purchases: parseInt(sform.purchases, 10) } : {}),
+    });
+    setSform({ date: today, spend: "", revenue: "", purchases: "" });
+    await Promise.all([loadMeta(), loadBudgets()]);
+    setSsaving(false);
+  }
+
+  async function delSpend(id: string) {
+    await apiSend(`/api/meta?id=${id}`, "DELETE");
+    await Promise.all([loadMeta(), loadBudgets()]);
+  }
 
   async function addBudget() {
     if (!bform.name || !bform.amount) return;
@@ -246,6 +269,61 @@ export default function MetaPage() {
         </Card>
       </div>
 
+      {/* Manual Ad Spend Entry */}
+      <Card
+        title="Manual Ad Spend"
+        className="mb-4"
+      >
+        <p className="text-xs text-muted mb-4">
+          Jab account se ads ke paise detect hon, yahan add karo. Ye cash-out ledger aur budget mein
+          apne aap count ho jayega. (Auto-sync bhi isi ko update karta hai.)
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <div>
+            <label className="label">Date</label>
+            <input
+              className="input"
+              type="date"
+              value={sform.date}
+              onChange={(e) => setSform({ ...sform, date: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Spend (PKR)</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="0"
+              value={sform.spend}
+              onChange={(e) => setSform({ ...sform, spend: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Revenue (optional)</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="0"
+              value={sform.revenue}
+              onChange={(e) => setSform({ ...sform, revenue: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Purchases (optional)</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="0"
+              value={sform.purchases}
+              onChange={(e) => setSform({ ...sform, purchases: e.target.value })}
+            />
+          </div>
+          <button className="btn-primary" onClick={addSpend} disabled={ssaving}>
+            {ssaving ? "Saving…" : "Add / Update"}
+          </button>
+        </div>
+      </Card>
+
       <Card
         title="Reports"
         action={
@@ -282,6 +360,7 @@ export default function MetaPage() {
                     <th className="py-3 px-2 text-right">Purchases</th>
                     <th className="py-3 px-2 text-right">Clicks</th>
                     <th className="py-3 px-2 text-right">Impressions</th>
+                    <th className="py-3 px-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,6 +375,11 @@ export default function MetaPage() {
                       <td className="py-3 px-2 text-right">{d.purchases}</td>
                       <td className="py-3 px-2 text-right text-muted">{fmtNum(d.clicks)}</td>
                       <td className="py-3 px-2 text-right text-muted">{fmtNum(d.impressions)}</td>
+                      <td className="py-3 px-2 text-right">
+                        <button className="text-bad hover:underline text-xs" onClick={() => delSpend(d.id)}>
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

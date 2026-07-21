@@ -24,13 +24,15 @@ const groups = [
     label: "Operations",
     items: [
       { href: "/meta", label: "Meta Ads", icon: "📈" },
-      { href: "/inventory", label: "Inventory", icon: "📦" },
       { href: "/cod", label: "COD Charges", icon: "🚚" },
     ],
   },
   {
-    label: "System",
-    items: [{ href: "/settings", label: "Settings", icon: "⚙️" }],
+    label: "Extra",
+    items: [
+      { href: "/inventory", label: "Inventory", icon: "📦" },
+      { href: "/settings", label: "Settings", icon: "⚙️" },
+    ],
   },
 ];
 
