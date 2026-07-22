@@ -161,6 +161,9 @@ const patchSchema = z.object({
   courier: z.string().optional(),
   totalPrice: z.number().nonnegative().optional(),
   cogs: z.number().nonnegative().optional(),
+  trackingId: z.string().optional(),
+  trackingUrl: z.string().optional(),
+  archived: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request) {
@@ -169,7 +172,7 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { id, stage, shippingAdvance, courier, totalPrice, cogs } = parsed.data;
+  const { id, stage, shippingAdvance, courier, totalPrice, cogs, trackingId, trackingUrl, archived } = parsed.data;
 
   const stageData = stage
     ? {
@@ -187,6 +190,9 @@ export async function PATCH(req: Request) {
       ...(courier !== undefined ? { courier } : {}),
       ...(totalPrice !== undefined ? { totalPrice } : {}),
       ...(cogs !== undefined ? { cogs } : {}),
+      ...(trackingId !== undefined ? { trackingId } : {}),
+      ...(trackingUrl !== undefined ? { trackingUrl } : {}),
+      ...(archived !== undefined ? { archived } : {}),
     },
   });
 

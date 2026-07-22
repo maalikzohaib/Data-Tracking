@@ -30,6 +30,9 @@ model Order {
   cogs           Float    @default(0) // cost of goods (manual: khud enter, shopify: SKU se)
   shippingAdvance Float   @default(0) // courier ko hand-paid advance (per order) — manual
   courier        String?  // TCS, Leopards, M&P, PostEx — manual
+  trackingId     String?  // courier tracking number — optional
+  trackingUrl    String?  // tracking link — optional
+  archived       Boolean  @default(false) // manually archive (clutter kam karne ke liye)
   cancelled      Boolean  @default(false)
   shopifyCreatedAt DateTime
   createdAt      DateTime @default(now())
