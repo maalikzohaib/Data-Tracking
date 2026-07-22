@@ -207,169 +207,6 @@ export default function MetaPage() {
         )}
       </Card>
 
-      {/* Ad Budget vs Spent */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        <Card title="Naya Ad Budget" className="lg:col-span-1 h-fit">
-          <div className="space-y-3">
-            <div>
-              <label className="label">Name / Period</label>
-              <input
-                className="input"
-                placeholder="e.g. July 2026"
-                value={bform.name}
-                onChange={(e) => setBform({ ...bform, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="label">Budget (PKR)</label>
-              <input
-                className="input"
-                type="number"
-                placeholder="0"
-                value={bform.amount}
-                onChange={(e) => setBform({ ...bform, amount: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="label">Period</label>
-              <select
-                className="input"
-                value={bform.period}
-                onChange={(e) => setBform({ ...bform, period: e.target.value })}
-              >
-                {["daily", "weekly", "monthly", "campaign"].map((p) => (
-                  <option key={p} value={p} className="capitalize">
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button className="btn-primary w-full" onClick={addBudget} disabled={bsaving}>
-              {bsaving ? "Saving…" : "Add Budget"}
-            </button>
-          </div>
-        </Card>
-
-        <Card title="Budget vs Spent (Meta actual)" className="lg:col-span-2">
-          {bsum && bsum.totalBudget > 0 ? (
-            <div className="mb-5">
-              <div className="flex items-end justify-between mb-2">
-                <div>
-                  <div className="text-xs text-muted">Total Allocated</div>
-                  <div className="text-xl font-bold">{fmtPKR(bsum.totalBudget)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-muted">Spent / Remaining</div>
-                  <div className="text-sm font-semibold">
-                    {fmtPKR(bsum.spent)} <span className="text-muted">/</span>{" "}
-                    <span className={bsum.remaining > 0 ? "text-good" : "text-bad"}>
-                      {fmtPKR(bsum.remaining)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="h-3 w-full rounded-full bg-panel2 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${bsum.usedPct}%`,
-                    backgroundImage:
-                      bsum.usedPct >= 90
-                        ? "linear-gradient(90deg,#f87171,#dc2626)"
-                        : "linear-gradient(90deg,#10b981,#f5c451)",
-                  }}
-                />
-              </div>
-              <div className="text-xs text-muted mt-1.5">{bsum.usedPct.toFixed(0)}% used</div>
-            </div>
-          ) : (
-            <EmptyState text="Koi budget set nahi. Left form se add karo." />
-          )}
-
-          {budgets.length > 0 && (
-            <div className="space-y-2">
-              {budgets.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex items-center justify-between rounded-xl bg-panel2 border border-border px-3 py-2"
-                >
-                  <div>
-                    <div className="text-sm font-medium">{b.name}</div>
-                    <div className="text-xs text-muted capitalize">
-                      {b.platform} · {b.period}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold">{fmtPKR(b.amount)}</span>
-                    <button
-                      className="text-bad hover:underline text-xs"
-                      onClick={() => delBudget(b.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Manual Ad Spend Entry */}
-      <Card
-        title="Manual Ad Spend"
-        className="mb-4"
-      >
-        <p className="text-xs text-muted mb-4">
-          Jab account se ads ke paise detect hon, yahan add karo. Ye cash-out ledger aur budget mein
-          apne aap count ho jayega. (Auto-sync bhi isi ko update karta hai.)
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-          <div>
-            <label className="label">Date</label>
-            <input
-              className="input"
-              type="date"
-              value={sform.date}
-              onChange={(e) => setSform({ ...sform, date: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label">Spend (PKR)</label>
-            <input
-              className="input"
-              type="number"
-              placeholder="0"
-              value={sform.spend}
-              onChange={(e) => setSform({ ...sform, spend: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label">Revenue (optional)</label>
-            <input
-              className="input"
-              type="number"
-              placeholder="0"
-              value={sform.revenue}
-              onChange={(e) => setSform({ ...sform, revenue: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label">Purchases (optional)</label>
-            <input
-              className="input"
-              type="number"
-              placeholder="0"
-              value={sform.purchases}
-              onChange={(e) => setSform({ ...sform, purchases: e.target.value })}
-            />
-          </div>
-          <button className="btn-primary" onClick={addSpend} disabled={ssaving}>
-            {ssaving ? "Saving…" : "Add / Update"}
-          </button>
-        </div>
-      </Card>
-
       <Card
         title="Reports"
         action={
@@ -463,6 +300,166 @@ export default function MetaPage() {
           </div>
         )}
       </Card>
+
+      {/* Manual Ad Spend Entry — Reports ke neeche */}
+      <Card title="Manual Ad Spend" className="mt-4">
+        <p className="text-xs text-muted mb-4">
+          Jab account se ads ke paise detect hon, yahan add karo. Ye cash-out ledger aur budget mein
+          apne aap count ho jayega. (Auto-sync bhi isi ko update karta hai.)
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <div>
+            <label className="label">Date</label>
+            <input
+              className="input"
+              type="date"
+              value={sform.date}
+              onChange={(e) => setSform({ ...sform, date: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Spend (PKR)</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="0"
+              value={sform.spend}
+              onChange={(e) => setSform({ ...sform, spend: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Revenue (optional)</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="0"
+              value={sform.revenue}
+              onChange={(e) => setSform({ ...sform, revenue: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Purchases (optional)</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="0"
+              value={sform.purchases}
+              onChange={(e) => setSform({ ...sform, purchases: e.target.value })}
+            />
+          </div>
+          <button className="btn-primary" onClick={addSpend} disabled={ssaving}>
+            {ssaving ? "Saving…" : "Add / Update"}
+          </button>
+        </div>
+      </Card>
+
+      {/* Ad Budget vs Spent — Reports ke neeche */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <Card title="Budget vs Spent (Meta actual)" className="lg:col-span-2">
+          {bsum && bsum.totalBudget > 0 ? (
+            <div className="mb-5">
+              <div className="flex items-end justify-between mb-2">
+                <div>
+                  <div className="text-xs text-muted">Total Allocated</div>
+                  <div className="text-xl font-bold">{fmtPKR(bsum.totalBudget)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-muted">Spent / Remaining</div>
+                  <div className="text-sm font-semibold">
+                    {fmtPKR(bsum.spent)} <span className="text-muted">/</span>{" "}
+                    <span className={bsum.remaining > 0 ? "text-good" : "text-bad"}>
+                      {fmtPKR(bsum.remaining)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-3 w-full rounded-full bg-panel2 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${bsum.usedPct}%`,
+                    backgroundImage:
+                      bsum.usedPct >= 90
+                        ? "linear-gradient(90deg,#f87171,#dc2626)"
+                        : "linear-gradient(90deg,#10b981,#f5c451)",
+                  }}
+                />
+              </div>
+              <div className="text-xs text-muted mt-1.5">{bsum.usedPct.toFixed(0)}% used</div>
+            </div>
+          ) : (
+            <EmptyState text="Koi budget set nahi. Right form se add karo." />
+          )}
+
+          {budgets.length > 0 && (
+            <div className="space-y-2">
+              {budgets.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex items-center justify-between rounded-xl bg-panel2 border border-border px-3 py-2"
+                >
+                  <div>
+                    <div className="text-sm font-medium">{b.name}</div>
+                    <div className="text-xs text-muted capitalize">
+                      {b.platform} · {b.period}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold">{fmtPKR(b.amount)}</span>
+                    <button
+                      className="text-bad hover:underline text-xs"
+                      onClick={() => delBudget(b.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Naya Ad Budget" className="lg:col-span-1 h-fit">
+          <div className="space-y-3">
+            <div>
+              <label className="label">Name / Period</label>
+              <input
+                className="input"
+                placeholder="e.g. July 2026"
+                value={bform.name}
+                onChange={(e) => setBform({ ...bform, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">Budget (PKR)</label>
+              <input
+                className="input"
+                type="number"
+                placeholder="0"
+                value={bform.amount}
+                onChange={(e) => setBform({ ...bform, amount: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">Period</label>
+              <select
+                className="input"
+                value={bform.period}
+                onChange={(e) => setBform({ ...bform, period: e.target.value })}
+              >
+                {["daily", "weekly", "monthly", "campaign"].map((p) => (
+                  <option key={p} value={p} className="capitalize">
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button className="btn-primary w-full" onClick={addBudget} disabled={bsaving}>
+              {bsaving ? "Saving…" : "Add Budget"}
+            </button>
+          </div>
+        </Card>
+      </div>
     </>
   );
 }

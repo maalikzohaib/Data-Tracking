@@ -165,8 +165,93 @@ export default function CashflowPage() {
         )}
       </Card>
 
-      {/* Loan / Borrow */}
+      {/* Manual cash entry + ledger */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <Card title="Manual Cash Entry" className="h-fit">
+          <p className="text-xs text-muted mb-3">
+            Opening balance ya koi cash jo kahin aur se track nahi hua.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="label">Type</label>
+              <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <option value="in">Cash In (andar aaya)</option>
+                <option value="out">Cash Out (bahar gaya)</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Source</label>
+              <input className="input" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="e.g. Opening balance" />
+            </div>
+            <div>
+              <label className="label">Amount (PKR)</label>
+              <input className="input" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Note</label>
+              <input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            </div>
+            <button className="btn-primary w-full" onClick={add} disabled={saving}>
+              {saving ? "Saving…" : "Add Entry"}
+            </button>
+          </div>
+        </Card>
+
+        <Card title="Ledger" className="lg:col-span-2">
+          {loading ? (
+            <div className="text-muted text-sm py-10 text-center">Loading…</div>
+          ) : flows.length === 0 ? (
+            <EmptyState text="Ledger khali hai." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted border-b border-border">
+                    <th className="py-3 px-2">Source</th>
+                    <th className="py-3 px-2">Note</th>
+                    <th className="py-3 px-2 text-right">In</th>
+                    <th className="py-3 px-2 text-right">Out</th>
+                    <th className="py-3 px-2 text-right">Balance</th>
+                    <th className="py-3 px-2 text-right">Date</th>
+                    <th className="py-3 px-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flows.map((f) => {
+                    const isManual = !f.refId && !AUTO_SOURCES.includes(f.source);
+                    return (
+                      <tr key={f.id} className="border-b border-border/50 hover:bg-panel2/50">
+                        <td className="py-3 px-2">
+                          <span className="pill bg-panel2 text-muted">{f.source}</span>
+                        </td>
+                        <td className="py-3 px-2 text-muted">{f.note || "—"}</td>
+                        <td className="py-3 px-2 text-right text-good">{f.type === "in" ? fmtPKR(f.amount) : "—"}</td>
+                        <td className="py-3 px-2 text-right text-bad">{f.type === "out" ? fmtPKR(f.amount) : "—"}</td>
+                        <td className="py-3 px-2 text-right font-semibold">{fmtPKR(f.balance)}</td>
+                        <td className="py-3 px-2 text-right text-muted">{fmtDate(f.happenedAt)}</td>
+                        <td className="py-3 px-2 text-right">
+                          {isManual ? (
+                            <button className="text-bad hover:underline text-xs" onClick={() => delFlow(f.id)}>
+                              Delete
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-muted/60" title="Auto-linked — apne page se edit karo">
+                              auto
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Loan / Borrow */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card title="Naya Loan / Udhaar" className="h-fit">
           <p className="text-xs text-muted mb-3">
             Bank ya kisi se udhaar liya paisa. Ye cash-in ho jayega par profit mein count nahi hoga.
@@ -247,91 +332,6 @@ export default function CashflowPage() {
                           <button className="text-bad hover:underline text-xs" onClick={() => delLoan(l.id)}>
                             Delete
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Manual cash entry + ledger */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="Manual Cash Entry" className="h-fit">
-          <p className="text-xs text-muted mb-3">
-            Opening balance ya koi cash jo kahin aur se track nahi hua.
-          </p>
-          <div className="space-y-3">
-            <div>
-              <label className="label">Type</label>
-              <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                <option value="in">Cash In (andar aaya)</option>
-                <option value="out">Cash Out (bahar gaya)</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Source</label>
-              <input className="input" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="e.g. Opening balance" />
-            </div>
-            <div>
-              <label className="label">Amount (PKR)</label>
-              <input className="input" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">Note</label>
-              <input className="input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-            </div>
-            <button className="btn-primary w-full" onClick={add} disabled={saving}>
-              {saving ? "Saving…" : "Add Entry"}
-            </button>
-          </div>
-        </Card>
-
-        <Card title="Ledger" className="lg:col-span-2">
-          {loading ? (
-            <div className="text-muted text-sm py-10 text-center">Loading…</div>
-          ) : flows.length === 0 ? (
-            <EmptyState text="Ledger khali hai." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted border-b border-border">
-                    <th className="py-3 px-2">Source</th>
-                    <th className="py-3 px-2">Note</th>
-                    <th className="py-3 px-2 text-right">In</th>
-                    <th className="py-3 px-2 text-right">Out</th>
-                    <th className="py-3 px-2 text-right">Balance</th>
-                    <th className="py-3 px-2 text-right">Date</th>
-                    <th className="py-3 px-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {flows.map((f) => {
-                    const isManual = !f.refId && !AUTO_SOURCES.includes(f.source);
-                    return (
-                      <tr key={f.id} className="border-b border-border/50 hover:bg-panel2/50">
-                        <td className="py-3 px-2">
-                          <span className="pill bg-panel2 text-muted">{f.source}</span>
-                        </td>
-                        <td className="py-3 px-2 text-muted">{f.note || "—"}</td>
-                        <td className="py-3 px-2 text-right text-good">{f.type === "in" ? fmtPKR(f.amount) : "—"}</td>
-                        <td className="py-3 px-2 text-right text-bad">{f.type === "out" ? fmtPKR(f.amount) : "—"}</td>
-                        <td className="py-3 px-2 text-right font-semibold">{fmtPKR(f.balance)}</td>
-                        <td className="py-3 px-2 text-right text-muted">{fmtDate(f.happenedAt)}</td>
-                        <td className="py-3 px-2 text-right">
-                          {isManual ? (
-                            <button className="text-bad hover:underline text-xs" onClick={() => delFlow(f.id)}>
-                              Delete
-                            </button>
-                          ) : (
-                            <span className="text-[10px] text-muted/60" title="Auto-linked — apne page se edit karo">
-                              auto
-                            </span>
-                          )}
                         </td>
                       </tr>
                     );
