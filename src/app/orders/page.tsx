@@ -49,10 +49,11 @@ type Order = {
 const COURIERS = ["", "TCS", "Leopards", "M&P", "PostEx", "Trax", "Daewoo", "Other"];
 const STAGES = ["processing", "shipped", "completed", "cancelled"] as const;
 
-// Color palette for order row labels
+// Color palette for order row labels (10 main colors + None)
 const COLOR_OPTIONS = [
   { label: "None",    value: "transparent" },
   { label: "Green",   value: "#22c55e" },
+  { label: "Lime",    value: "#84cc16" },
   { label: "Orange",  value: "#f97316" },
   { label: "Yellow",  value: "#eab308" },
   { label: "Red",     value: "#ef4444" },
@@ -60,6 +61,7 @@ const COLOR_OPTIONS = [
   { label: "Purple",  value: "#a855f7" },
   { label: "Pink",    value: "#ec4899" },
   { label: "Cyan",    value: "#06b6d4" },
+  { label: "Gray",    value: "#6b7280" },
 ];
 
 /** Normalize phone: +923xx → 03xx, 923xx → 03xx, already 03xx → as-is */

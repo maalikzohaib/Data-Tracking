@@ -25,16 +25,18 @@ function normalizePhone(raw: string | null | undefined): string | null {
   return p;
 }
 
-/** Map Shopify fulfillment_status → deliveryStatus */
-function mapDeliveryStatus(fulfillment: string | null | undefined): string {
-  if (!fulfillment) return "pending under ATC";
-  const f = fulfillment.toLowerCase();
-  if (f === "fulfilled") return "delivered";
-  if (f === "partial") return "in transit";
-  return "pending under ATC";
+// Pre-fetched product buy prices (filled once per sync for speed)
+let _buyPriceCache: Map<string, number> | null = null;
+
+async function getBuyPriceMap(): Promise<Map<string, number>> {
+  if (_buyPriceCache) return _buyPriceCache;
+  const all = await prisma.product.findMany({ select: { sku: true, buyPrice: true } });
+  _buyPriceCache = new Map(all.filter((p) => p.sku).map((p) => [p.sku!, p.buyPrice]));
+  return _buyPriceCache;
 }
 
 // Upsert a single Shopify order into the DB (used by sync + webhook).
+// IMPORTANT: Does NOT overwrite deliveryStatus, labelColor, or user-set fields on update.
 export async function upsertOrder(o: ShopifyOrder): Promise<void> {
   const shopifyId = String(o.id);
   const shipping = num(o.total_shipping_price_set?.shop_money?.amount);
@@ -49,14 +51,9 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
     null
   );
   const itemNames = o.line_items.map((li) => li.title).join(", ");
-  const deliveryStatus = mapDeliveryStatus(o.fulfillment_status);
 
-  // COGS: sum(line item qty * product buyPrice) — matched by SKU.
-  const skus = o.line_items.map((li) => li.sku).filter(Boolean) as string[];
-  const products = skus.length
-    ? await prisma.product.findMany({ where: { sku: { in: skus } } })
-    : [];
-  const buyBySku = new Map(products.map((p) => [p.sku, p.buyPrice]));
+  // COGS: use cached product prices for speed
+  const buyBySku = await getBuyPriceMap();
   let cogs = 0;
   for (const li of o.line_items) {
     if (li.sku && buyBySku.has(li.sku)) {
@@ -83,7 +80,9 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       financialStatus: o.financial_status,
       fulfillmentStatus: o.fulfillment_status,
       paymentMethod: paymentMethod(o),
-      deliveryStatus,
+      // NEW orders: default to "pending under ATC" and GREEN color
+      deliveryStatus: "pending under ATC",
+      labelColor: "#22c55e",
       itemCount,
       cogs,
       cancelled: !!o.cancelled_at,
@@ -99,6 +98,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       },
     },
     update: {
+      // Only update Shopify-sourced fields; NEVER overwrite deliveryStatus, labelColor, or user-set fields
       orderNumber: o.name ?? String(o.order_number),
       customerName,
       customerPhone,
@@ -111,7 +111,6 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       financialStatus: o.financial_status,
       fulfillmentStatus: o.fulfillment_status,
       paymentMethod: paymentMethod(o),
-      deliveryStatus,
       itemCount,
       cogs,
       cancelled: !!o.cancelled_at,
@@ -139,12 +138,23 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
 }
 
 export async function syncShopifyOrders(): Promise<number> {
-  // Sync orders updated in the last 60 days (incremental-ish, keeps it fast).
-  const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+  // Reset COGS cache so we get fresh product prices
+  _buyPriceCache = null;
+
+  // Sync orders updated in the last 30 days (fast incremental sync).
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const orders = await fetchShopifyOrders(since);
-  for (const o of orders) {
-    await upsertOrder(o);
+
+  // Pre-warm the buy price cache once (instead of per-order)
+  await getBuyPriceMap();
+
+  // Process orders in batches of 5 for speed (avoids overwhelming Neon connection pool)
+  const BATCH = 5;
+  for (let i = 0; i < orders.length; i += BATCH) {
+    const batch = orders.slice(i, i + BATCH);
+    await Promise.all(batch.map((o) => upsertOrder(o)));
   }
+
   await prisma.syncLog.create({
     data: { source: "shopify-orders", status: "success", count: orders.length },
   });
