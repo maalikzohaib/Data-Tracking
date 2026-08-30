@@ -117,11 +117,69 @@ const emptyForm = {
   specialDetails: "",
 };
 
+type DatePreset = "all" | "today" | "3days" | "7days" | "30days" | "thisMonth" | "custom";
+
+function isWithinDateRange(
+  dateStr: string,
+  preset: DatePreset,
+  customFrom?: string,
+  customTo?: string
+): boolean {
+  if (preset === "all") return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+
+  const now = new Date();
+
+  if (preset === "today") {
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return d >= todayStart && d <= todayEnd;
+  }
+
+  if (preset === "3days") {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 0, 0, 0, 0);
+    return d >= start;
+  }
+
+  if (preset === "7days") {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+    return d >= start;
+  }
+
+  if (preset === "30days") {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
+    return d >= start;
+  }
+
+  if (preset === "thisMonth") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    return d >= start;
+  }
+
+  if (preset === "custom") {
+    if (customFrom) {
+      const from = new Date(customFrom + "T00:00:00");
+      if (!isNaN(from.getTime()) && d < from) return false;
+    }
+    if (customTo) {
+      const to = new Date(customTo + "T23:59:59");
+      if (!isNaN(to.getTime()) && d > to) return false;
+    }
+    return true;
+  }
+
+  return true;
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<"active" | "courierHanded" | "delivered" | "archive">("active");
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -248,6 +306,19 @@ export default function OrdersPage() {
   const isActive = (o: Order) =>
     !isArchived(o) && !isDelivered(o) && !isCourierHanded(o);
 
+  const getOrderSection = (o: Order): { key: string; label: string; icon: string; badgeStyle: string } => {
+    if (isArchived(o)) {
+      return { key: "archive", label: "Archive", icon: "📦", badgeStyle: "bg-gray-500/20 text-gray-300 border border-gray-500/30" };
+    }
+    if (isDelivered(o)) {
+      return { key: "delivered", label: "Delivered", icon: "✅", badgeStyle: "bg-blue-500/20 text-blue-400 border border-blue-500/30" };
+    }
+    if (isCourierHanded(o)) {
+      return { key: "courierHanded", label: "Courier Handed", icon: "🚚", badgeStyle: "bg-amber-500/20 text-amber-400 border border-amber-500/30" };
+    }
+    return { key: "active", label: "Active", icon: "🛒", badgeStyle: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" };
+  };
+
   const bySearch = (o: Order) =>
     !q ||
     o.orderNumber?.toLowerCase().includes(q.toLowerCase()) ||
@@ -262,53 +333,201 @@ export default function OrdersPage() {
   const deliveredOrders = orders.filter(isDelivered);
   const archivedOrders = orders.filter(isArchived);
 
-  const shownMap = {
-    active: activeOrders,
-    courierHanded: courierHandedOrders,
-    delivered: deliveredOrders,
-    archive: archivedOrders,
-  };
-  const shown = shownMap[tab].filter(bySearch);
+  // All orders filtered by selected date preset / custom range
+  const dateFilteredOrders = orders.filter((o) =>
+    isWithinDateRange(o.shopifyCreatedAt || (o as any).createdAt, datePreset, customFrom, customTo)
+  );
 
-  const totalSales = activeOrders.reduce((s, o) => s + o.totalPrice, 0);
-  const completedSales = activeOrders
-    .filter((o) => o.stage === "completed" || o.financialStatus === "paid" || o.deliveryStatus === "delivered")
-    .reduce((s, o) => s + o.totalPrice, 0);
-  const totalAdvance = activeOrders.reduce((s, o) => s + (o.shippingAdvance || 0), 0);
-  const pendingCount = activeOrders.filter(
-    (o) => o.deliveryStatus !== "delivered" && o.financialStatus !== "paid"
-  ).length;
+  // GLOBAL SEARCH: If search query 'q' is entered, search across ALL date-filtered orders regardless of current tab.
+  // TAB FILTER: If no search query, filter date-filtered orders by currently selected section tab.
+  const shown = q
+    ? dateFilteredOrders.filter(bySearch)
+    : dateFilteredOrders.filter((o) => {
+        if (tab === "active") return isActive(o);
+        if (tab === "courierHanded") return isCourierHanded(o);
+        if (tab === "delivered") return isDelivered(o);
+        return isArchived(o);
+      });
+
+  // Dynamic KPI Cards per tab state or global search
+  const renderKpiCards = () => {
+    if (q) {
+      const totalCount = shown.length;
+      const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      const deliveredCount = shown.filter(isDelivered).length;
+      const deliveredVal = shown.filter(isDelivered).reduce((sum, o) => sum + o.totalPrice, 0);
+
+      const activeOrHanded = shown.filter((o) => !isDelivered(o) && !isArchived(o));
+      const activeHandedCount = activeOrHanded.length;
+      const activeHandedVal = activeOrHanded.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      return (
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <StatCard label="Global Matches" value={String(totalCount)} sub={`Search results for "${q}"`} icon="🔍" tone="brand" />
+          <StatCard label="Total Match Value" value={fmtPKR(totalSales)} sub="Total value of results" icon="💰" tone="good" />
+          <StatCard label="Delivered Matched" value={String(deliveredCount)} sub={`Val: ${fmtPKR(deliveredVal)}`} icon="✅" tone="accent" />
+          <StatCard label="Active / Handed" value={String(activeHandedCount)} sub={`Val: ${fmtPKR(activeHandedVal)}`} icon="🚚" tone="warn" />
+        </div>
+      );
+    }
+
+    if (tab === "active") {
+      const totalCount = shown.length;
+      const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      const unconfirmed = shown.filter((o) => o.confirmationStatus !== "confirmed");
+      const unconfirmedCount = unconfirmed.length;
+      const unconfirmedVal = unconfirmed.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      const pendingFulfill = shown.filter((o) => !o.isCourierHanded);
+      const pendingFulfillCount = pendingFulfill.length;
+      const pendingFulfillVal = pendingFulfill.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      return (
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <StatCard label="Total Active Orders" value={String(totalCount)} sub="Active orders" icon="🛒" tone="brand" />
+          <StatCard label="Active Sales" value={fmtPKR(totalSales)} sub="Total active value" icon="💰" tone="good" />
+          <StatCard label="Pending Confirmation" value={String(unconfirmedCount)} sub={`Val: ${fmtPKR(unconfirmedVal)}`} icon="⏳" tone="warn" />
+          <StatCard label="Pending Fulfillment" value={String(pendingFulfillCount)} sub={`Val: ${fmtPKR(pendingFulfillVal)}`} icon="📦" tone="accent" />
+        </div>
+      );
+    }
+
+    if (tab === "courierHanded") {
+      const totalCount = shown.length;
+      const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      const codOrders = shown.filter((o) => (o.paymentMethod || "COD") === "COD");
+      const codVal = codOrders.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      const inTransit = shown.filter((o) => o.deliveryStatus !== "delivered");
+      const inTransitCount = inTransit.length;
+      const inTransitVal = inTransit.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      return (
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <StatCard label="Total Handed Orders" value={String(totalCount)} sub="With courier" icon="🚚" tone="brand" />
+          <StatCard label="Handed Sales" value={fmtPKR(totalSales)} sub="Total handed value" icon="💰" tone="good" />
+          <StatCard label="COD Amount to Receive" value={fmtPKR(codVal)} sub={`${codOrders.length} COD orders`} icon="💵" tone="warn" />
+          <StatCard label="Orders in Transit" value={String(inTransitCount)} sub={`Val: ${fmtPKR(inTransitVal)}`} icon="🛣️" tone="accent" />
+        </div>
+      );
+    }
+
+    if (tab === "delivered") {
+      const totalCount = shown.length;
+      const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
+
+      const codReceived = shown.filter((o) => (o.paymentMethod || "COD") === "COD").reduce((sum, o) => sum + o.totalPrice, 0);
+      const aov = totalCount > 0 ? totalSales / totalCount : 0;
+
+      return (
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <StatCard label="Total Delivered Orders" value={String(totalCount)} sub="Delivered & completed" icon="✅" tone="brand" />
+          <StatCard label="Total Received Sales" value={fmtPKR(totalSales)} sub="Completed sales" icon="💰" tone="good" />
+          <StatCard label="Total COD Received" value={fmtPKR(codReceived)} sub="COD collected" icon="💵" tone="accent" />
+          <StatCard label="Average Order Value" value={fmtPKR(aov)} sub="AOV per order" icon="📊" tone="warn" />
+        </div>
+      );
+    }
+
+    // Archive tab
+    const totalCount = shown.length;
+    const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
+
+    const returnedOrCancelled = shown.filter((o) => o.cancelled || o.deliveryStatus === "returned" || o.deliveryStatus === "cancelled" || o.stage === "cancelled");
+    const retCancelCount = returnedOrCancelled.length;
+    const lostVal = returnedOrCancelled.reduce((sum, o) => sum + o.totalPrice, 0);
+
+    return (
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Total Archived Orders" value={String(totalCount)} sub="Archived orders" icon="📦" tone="brand" />
+        <StatCard label="Archived Sales Value" value={fmtPKR(totalSales)} sub="Total value archived" icon="💰" tone="good" />
+        <StatCard label="Returned / Cancelled" value={String(retCancelCount)} sub="Cancelled/returned count" icon="⚠️" tone="warn" />
+        <StatCard label="Total Lost Value" value={fmtPKR(lostVal)} sub="Lost order value" icon="❌" tone="bad" />
+      </div>
+    );
+  };
 
   return (
     <>
       <PageHeader
         title="Orders / Sales"
         subtitle="Shopify se synced + manual orders — full-width 16-column view"
-        action={
-          <div className="flex flex-wrap gap-2 items-center">
-            {syncMsg && <span className="text-xs text-muted">{syncMsg}</span>}
+        action={syncMsg ? <span className="text-xs text-muted bg-panel2 px-3 py-1.5 rounded-xl border border-border">{syncMsg}</span> : null}
+      />
+
+      {/* Filter Bar: Date Presets & Custom Range & Search & Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-panel border border-border p-3 rounded-2xl shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted bg-panel2/60 px-3 py-1.5 rounded-xl border border-border">
+            <span>📅 Date:</span>
+            <select
+              className="bg-transparent text-xs font-medium text-text focus:outline-none cursor-pointer"
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value as DatePreset)}
+            >
+              <option value="all" className="bg-panel text-text">All Time</option>
+              <option value="today" className="bg-panel text-text">Today</option>
+              <option value="3days" className="bg-panel text-text">Last 3 Days</option>
+              <option value="7days" className="bg-panel text-text">Last 7 Days</option>
+              <option value="30days" className="bg-panel text-text">Last 30 Days</option>
+              <option value="thisMonth" className="bg-panel text-text">This Month</option>
+              <option value="custom" className="bg-panel text-text">Custom Range</option>
+            </select>
+          </div>
+
+          {datePreset === "custom" && (
+            <div className="flex items-center gap-2 bg-panel2/60 px-3 py-1 rounded-xl border border-border">
+              <input
+                type="date"
+                className="bg-transparent text-xs text-text focus:outline-none"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+              />
+              <span className="text-xs text-muted">to</span>
+              <input
+                type="date"
+                className="bg-transparent text-xs text-text focus:outline-none"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
             <input
-              className="input max-w-[180px]"
-              placeholder="Search order, name, phone…"
+              className="input pl-8 pr-8 py-1.5 text-xs w-[220px] sm:w-[280px]"
+              placeholder="Search Order #, name, phone, item..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            <button className="btn-ghost whitespace-nowrap" onClick={syncShopify} disabled={syncing}>
-              {syncing ? "Syncing…" : "🔄 Sync Shopify"}
-            </button>
-            <button className="btn-primary whitespace-nowrap" onClick={() => setShowForm((v) => !v)}>
-              {showForm ? "✕ Close" : "+ New Order"}
-            </button>
+            <span className="absolute left-2.5 top-2 text-xs text-muted pointer-events-none">🔍</span>
+            {q && (
+              <button
+                onClick={() => setQ("")}
+                className="absolute right-2.5 top-2 text-xs text-muted hover:text-text"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </div>
-        }
-      />
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Active Orders" value={String(activeOrders.length)} sub={`${pendingCount} pending`} icon="🛒" tone="brand" />
-        <StatCard label="Total Sales" value={fmtPKR(totalSales)} icon="💰" tone="good" />
-        <StatCard label="Received (completed)" value={fmtPKR(completedSales)} icon="✅" tone="accent" />
-        <StatCard label="Shipping Advance" value={fmtPKR(totalAdvance)} icon="🚚" tone="warn" />
+          <button className="btn-ghost whitespace-nowrap text-xs py-1.5" onClick={syncShopify} disabled={syncing}>
+            {syncing ? "Syncing…" : "🔄 Sync Shopify"}
+          </button>
+          <button className="btn-primary whitespace-nowrap text-xs py-1.5" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "✕ Close" : "+ New Order"}
+          </button>
+        </div>
       </div>
+
+      {/* Context-Aware Dynamic KPI Cards */}
+      {renderKpiCards()}
 
       {/* New order form */}
       {showForm && (
@@ -394,6 +613,21 @@ export default function OrdersPage() {
         </Card>
       )}
 
+      {/* Global Search Active Notice */}
+      {q && (
+        <div className="flex items-center justify-between bg-brand/10 border border-brand/20 text-brand-light px-4 py-2.5 rounded-2xl mb-4 text-xs font-medium shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🔍</span>
+            <span>
+              Searching <strong>Globally across ALL sections</strong> for "<strong className="text-white">{q}</strong>" — {shown.length} order{shown.length === 1 ? "" : "s"} found. Each order displays its current workflow section badge below its order number.
+            </span>
+          </div>
+          <button onClick={() => setQ("")} className="bg-panel2 hover:bg-panel text-text px-2.5 py-1 rounded-lg border border-border transition text-xs font-semibold">
+            ✕ Clear Search
+          </button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="inline-flex rounded-xl bg-panel2 border border-border p-1 mb-4">
         {([
@@ -420,10 +654,14 @@ export default function OrdersPage() {
           <div className="text-muted text-sm py-10 text-center">Loading…</div>
         ) : shown.length === 0 ? (
           <EmptyState text={
-            tab === "active" ? "Koi active order nahi." :
-            tab === "courierHanded" ? "Koi courier handed order nahi." :
-            tab === "delivered" ? "Abhi koi delivered order nahi." :
-            "Archive khali hai."
+            q
+              ? `No orders found matching "${q}" in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : "Archive"}.`
+              : datePreset !== "all"
+              ? `No orders found for selected date filter in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : "Archive"}.`
+              : tab === "active" ? "No active orders found." :
+                tab === "courierHanded" ? "No courier handed orders found." :
+                tab === "delivered" ? "No delivered orders found." :
+                "Archive is empty."
           } />
         ) : (
           <div className="overflow-x-auto">
@@ -463,6 +701,7 @@ export default function OrdersPage() {
                   const isConfirmed = o.confirmationStatus === "confirmed";
                   const payMethod = o.paymentMethod || "COD";
                   const rowColor = o.labelColor && o.labelColor !== "transparent" && o.labelColor !== "#transparent" ? o.labelColor : null;
+                  const section = getOrderSection(o);
 
                   return (
                     <tr
@@ -506,10 +745,17 @@ export default function OrdersPage() {
                         {fmtDate(o.shopifyCreatedAt)}
                       </td>
 
-                      {/* 2. Order No # */}
+                      {/* 2. Order No # + Workflow Section Badge */}
                       <td className="py-2.5 px-2 font-bold text-text whitespace-nowrap">
-                        {o.orderNumber || "—"}
-                        {o.source === "manual" && <span className="ml-1 text-[10px] text-brand-light" title="Manual order">✍</span>}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span>{o.orderNumber || "—"}</span>
+                            {o.source === "manual" && <span className="text-[10px] text-brand-light" title="Manual order">✍</span>}
+                          </div>
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold w-max ${section.badgeStyle}`}>
+                            {section.icon} {section.label}
+                          </span>
+                        </div>
                       </td>
 
                       {/* 3. Name */}
