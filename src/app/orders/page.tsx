@@ -452,14 +452,8 @@ export default function OrdersPage() {
 
   return (
     <>
-      <PageHeader
-        title="Orders / Sales"
-        subtitle="Shopify se synced + manual orders — full-width 16-column view"
-        action={syncMsg ? <span className="text-xs text-muted bg-panel2 px-3 py-1.5 rounded-xl border border-border">{syncMsg}</span> : null}
-      />
-
-      {/* Filter Bar: Date Presets & Custom Range & Search & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-panel border border-border p-3 rounded-2xl shadow-sm">
+      {/* Filter Bar: Date Presets & Custom Range & Search & Sync */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-panel border border-border p-3 rounded-2xl shadow-sm pt-14 lg:pt-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-muted bg-panel2/60 px-3 py-1.5 rounded-xl border border-border">
             <span>📅 Date:</span>
@@ -495,6 +489,8 @@ export default function OrdersPage() {
               />
             </div>
           )}
+
+          {syncMsg && <span className="text-xs text-muted bg-panel2 px-2.5 py-1 rounded-xl border border-border">{syncMsg}</span>}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -519,9 +515,6 @@ export default function OrdersPage() {
 
           <button className="btn-ghost whitespace-nowrap text-xs py-1.5" onClick={syncShopify} disabled={syncing}>
             {syncing ? "Syncing…" : "🔄 Sync Shopify"}
-          </button>
-          <button className="btn-primary whitespace-nowrap text-xs py-1.5" onClick={() => setShowForm((v) => !v)}>
-            {showForm ? "✕ Close" : "+ New Order"}
           </button>
         </div>
       </div>
