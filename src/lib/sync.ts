@@ -50,7 +50,14 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
     o.billing_address?.phone ||
     null
   );
-  const itemNames = o.line_items.map((li) => li.title).join(", ");
+  function formatLineItemTitle(li: { title: string; variant_title?: string | null; name?: string | null }): string {
+    if (li.variant_title && li.variant_title !== "Default Title") {
+      return `${li.title} - ${li.variant_title}`;
+    }
+    return li.name || li.title;
+  }
+
+  const itemNames = o.line_items.map(formatLineItemTitle).join(", ");
 
   // COGS: use cached product prices for speed
   const buyBySku = await getBuyPriceMap();
@@ -89,7 +96,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       shopifyCreatedAt: new Date(o.created_at),
       lineItems: {
         create: o.line_items.map((li) => ({
-          title: li.title,
+          title: formatLineItemTitle(li),
           sku: li.sku,
           quantity: li.quantity,
           price: num(li.price),
@@ -114,6 +121,16 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       itemCount,
       cogs,
       cancelled: !!o.cancelled_at,
+      lineItems: {
+        deleteMany: {},
+        create: o.line_items.map((li) => ({
+          title: formatLineItemTitle(li),
+          sku: li.sku,
+          quantity: li.quantity,
+          price: num(li.price),
+          productId: li.product_id ? String(li.product_id) : null,
+        })),
+      },
     },
   });
 
@@ -137,12 +154,12 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
   }
 }
 
-export async function syncShopifyOrders(): Promise<number> {
+export async function syncShopifyOrders(sinceISO?: string): Promise<number> {
   // Reset COGS cache so we get fresh product prices
   _buyPriceCache = null;
 
-  // Sync orders updated in the last 30 days (fast incremental sync).
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Sync orders (default last 180 days for full variant & status coverage).
+  const since = sinceISO !== undefined ? sinceISO : new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
   const orders = await fetchShopifyOrders(since);
 
   // Pre-warm the buy price cache once (instead of per-order)

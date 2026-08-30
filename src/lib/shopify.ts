@@ -24,6 +24,8 @@ type ShopifyOrder = {
   line_items: {
     id: number;
     title: string;
+    variant_title?: string | null;
+    name?: string | null;
     sku: string | null;
     quantity: number;
     price: string;

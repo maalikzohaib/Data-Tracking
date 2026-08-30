@@ -4,24 +4,25 @@ const config: Config = {
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        bg: "#0b0f10",
-        panel: "#12181a",
-        panel2: "#171f22",
-        border: "#232e31",
-        muted: "#7d8f92",
-        text: "#e8efec",
+        bg: "var(--bg)",
+        panel: "var(--panel)",
+        panel2: "var(--panel2)",
+        border: "var(--border)",
+        muted: "var(--muted)",
+        text: "var(--text)",
         brand: {
-          DEFAULT: "#10b981",
-          light: "#34d399",
-          dark: "#059669",
+          DEFAULT: "var(--brand)",
+          light: "var(--brand-light)",
+          dark: "var(--brand-dark)",
         },
-        accent: "#f5c451",
-        good: "#34d399",
-        bad: "#f87171",
-        warn: "#fbbf24",
+        accent: "var(--accent)",
+        good: "var(--good)",
+        bad: "var(--bad)",
+        warn: "var(--warn)",
       },
       fontFamily: {
         sans: ["var(--font-body)", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
@@ -29,7 +30,7 @@ const config: Config = {
       },
       boxShadow: {
         glow: "0 0 0 1px rgba(16,185,129,0.2), 0 8px 30px rgba(16,185,129,0.12)",
-        card: "0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 30px rgba(0,0,0,0.4)",
+        card: "var(--card-shadow)",
       },
       backgroundImage: {
         "grid-fade":

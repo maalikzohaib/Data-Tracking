@@ -12,12 +12,9 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3 mb-6 pt-14 lg:pt-0">
+    <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
       <div>
-        <h1
-          className="text-2xl font-display font-bold bg-clip-text text-transparent"
-          style={{ backgroundImage: "linear-gradient(135deg, #e8efec, #34d399)" }}
-        >
+        <h1 className="text-2xl font-display font-bold text-text tracking-tight">
           {title}
         </h1>
         {subtitle && <p className="text-sm text-muted mt-1">{subtitle}</p>}

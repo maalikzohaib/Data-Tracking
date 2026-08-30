@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 
 const groups = [
   {
     label: "Overview",
     items: [
-      { href: "/", label: "Dashboard", icon: "📊" },
       { href: "/orders", label: "Orders / Sales", icon: "🛒" },
+      { href: "/dashboard", label: "Dashboard", icon: "📊" },
     ],
   },
   {
@@ -36,48 +35,59 @@ const groups = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+
+  // Hide on login page
+  if (pathname === "/login") return null;
 
   return (
     <>
-      {/* Mobile top bar */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 h-14 bg-panel border-b border-border">
-        <div className="flex items-center gap-2">
-          <LogoMark />
-          <span className="font-semibold">Business Tracker</span>
-        </div>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="btn-ghost px-3 py-1.5"
-        >
-          {open ? "✕" : "☰"}
-        </button>
-      </div>
+      {/* Backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity"
+          onClick={onClose}
+        />
+      )}
 
-      {/* Sidebar */}
+      {/* Slide-out Drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col
-        border-r border-border transition-transform
-        ${open ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg, #0f1719 0%, #0b0f10 100%)",
-        }}
+        className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col bg-panel border-r border-border shadow-2xl transition-transform duration-300 ease-in-out ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
-          <LogoMark />
-          <div>
-            <div className="font-display font-semibold leading-tight tracking-tight">Business Tracker</div>
-            <div className="text-[11px] text-muted">Shopify · Meta · PKR</div>
+        {/* Drawer Header */}
+        <div className="h-16 flex items-center justify-between px-5 border-b border-border bg-panel2">
+          <div className="flex items-center gap-3">
+            <LogoMark />
+            <div>
+              <div className="font-display font-bold leading-tight tracking-tight text-text">
+                Navigation
+              </div>
+              <div className="text-[11px] text-muted">Select a section</div>
+            </div>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-panel border border-transparent hover:border-border transition"
+            title="Close menu"
+          >
+            ✕
+          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        {/* Navigation Items */}
+        <nav className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
           {groups.map((g) => (
             <div key={g.label}>
-              <div className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+              <div className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-muted">
                 {g.label}
               </div>
               <div className="space-y-1">
@@ -87,11 +97,10 @@ export default function Sidebar() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => setOpen(false)}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition
-                      ${
+                      onClick={onClose}
+                      className={`flex items-center gap-3.5 rounded-xl px-3.5 py-2.5 text-sm font-medium transition ${
                         active
-                          ? "text-white shadow-glow"
+                          ? "text-white shadow-glow bg-brand font-semibold"
                           : "text-muted hover:text-text hover:bg-panel2"
                       }`}
                       style={
@@ -103,7 +112,7 @@ export default function Sidebar() {
                           : undefined
                       }
                     >
-                      <span className="text-base">{item.icon}</span>
+                      <span className="text-lg">{item.icon}</span>
                       {item.label}
                     </Link>
                   );
@@ -113,17 +122,12 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-border text-[11px] text-muted">
-          Manual sync · Settings se · v1.0
+        {/* Footer info */}
+        <div className="p-4 border-t border-border bg-panel2 text-[11px] text-muted flex items-center justify-between">
+          <span>Business Tracker v1.0</span>
+          <span className="text-brand-light font-semibold">Online</span>
         </div>
       </aside>
-
-      {open && (
-        <div
-          className="lg:hidden fixed inset-0 z-30 bg-black/50"
-          onClick={() => setOpen(false)}
-        />
-      )}
     </>
   );
 }

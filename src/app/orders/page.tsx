@@ -453,7 +453,7 @@ export default function OrdersPage() {
   return (
     <>
       {/* Filter Bar: Date Presets & Custom Range & Search & Sync */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-panel border border-border p-3 rounded-2xl shadow-sm pt-14 lg:pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-panel border border-border p-3 rounded-2xl shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-muted bg-panel2/60 px-3 py-1.5 rounded-xl border border-border">
             <span>📅 Date:</span>
@@ -658,29 +658,30 @@ export default function OrdersPage() {
           } />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left border-collapse min-w-[1500px]">
+            <table className="w-full text-xs sm:text-sm text-left border-collapse">
               <thead>
-                <tr className="bg-panel2/80 text-muted uppercase font-semibold text-[11px] border-b border-border tracking-wider">
-                  <th className="py-3 px-1 text-center whitespace-nowrap min-w-[32px]"></th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[95px]">Date</th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[90px]">Order No #</th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[130px]">Name</th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[160px]">Item Name</th>
-                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[45px]">Qty</th>
-                  <th className="py-3 px-2 text-right whitespace-nowrap min-w-[85px]">Price</th>
-                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[105px]">Confirmation</th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[140px]">Payment</th>
-                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[75px]">Slip Print</th>
-                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[70px]">Packed</th>
-                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[100px]">Courier Hand</th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[125px]">Contact No</th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[135px]">Remarks</th>
-                  <th className="py-3 px-2 whitespace-nowrap min-w-[135px]">Status</th>
-                  <th className="py-3 px-2 text-right whitespace-nowrap min-w-[90px]">Actions</th>
+                <tr className="bg-panel2/80 text-muted uppercase font-semibold text-[11px] sm:text-xs border-b border-border tracking-wider">
+                  <th className="py-3 px-1.5 text-center whitespace-nowrap min-w-[32px]">#</th>
+                  <th className="py-3 px-1 text-center whitespace-nowrap"></th>
+                  <th className="py-3 px-1.5 whitespace-nowrap">Date</th>
+                  <th className="py-3 px-1.5 whitespace-nowrap">Order No #</th>
+                  <th className="py-3 px-1.5 whitespace-nowrap">Name</th>
+                  <th className="py-3 px-2 min-w-[180px]">Item Name</th>
+                  <th className="py-3 px-1 text-center whitespace-nowrap">Qty</th>
+                  <th className="py-3 px-1.5 text-right whitespace-nowrap">Price</th>
+                  <th className="py-3 px-1 text-center whitespace-nowrap">Confirmation</th>
+                  <th className="py-3 px-1 whitespace-nowrap">Payment</th>
+                  <th className="py-3 px-1 text-center whitespace-nowrap">Slip Print</th>
+                  <th className="py-3 px-1 text-center whitespace-nowrap">Packed</th>
+                  <th className="py-3 px-1 text-center whitespace-nowrap">Courier Hand</th>
+                  <th className="py-3 px-1.5 whitespace-nowrap">Contact No</th>
+                  <th className="py-3 px-2 min-w-[150px]">Remarks</th>
+                  <th className="py-3 px-1.5 whitespace-nowrap">Status</th>
+                  <th className="py-3 px-1.5 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/40">
-                {shown.map((o) => {
+              <tbody className="divide-y-0">
+                {shown.map((o, index) => {
                   const displayItem =
                     o.itemName ||
                     (o.lineItems && o.lineItems.length > 0
@@ -702,16 +703,21 @@ export default function OrdersPage() {
                       className="hover:bg-panel2/40 transition-colors"
                       style={rowColor ? { backgroundColor: `${rowColor}18` } : undefined}
                     >
+                      {/* Numbering */}
+                      <td className="py-2.5 px-1.5 text-center text-muted font-mono font-medium text-xs">
+                        {index + 1}
+                      </td>
+
                       {/* Color Label */}
                       <td className="py-2.5 px-1 text-center relative">
                         <button
                           onClick={() => setColorPickerOpen(colorPickerOpen === o.id ? null : o.id)}
-                          className="w-5 h-5 rounded border-2 border-border/60 hover:border-brand cursor-pointer transition inline-block"
-                          style={{ backgroundColor: rowColor || "transparent" }}
+                          className="w-5 h-5 rounded border-0 bg-panel2/80 hover:scale-110 cursor-pointer transition inline-block"
+                          style={{ backgroundColor: rowColor || undefined }}
                           title="Set order color"
                         />
                         {colorPickerOpen === o.id && (
-                          <div className="absolute left-6 top-1 z-50 bg-panel border border-border rounded-lg shadow-xl p-2 flex gap-1.5 flex-wrap w-[140px]">
+                          <div className="absolute left-6 top-1 z-50 bg-panel border border-border/40 rounded-lg shadow-xl p-2 flex gap-1.5 flex-wrap w-[140px]">
                             {COLOR_OPTIONS.map((c) => (
                               <button
                                 key={c.value}
@@ -720,10 +726,10 @@ export default function OrdersPage() {
                                   updateField(o.id, { labelColor: c.value } as Partial<Order>);
                                   setColorPickerOpen(null);
                                 }}
-                                className={`w-6 h-6 rounded-full border-2 transition hover:scale-110 ${
+                                className={`w-6 h-6 rounded-full border-0 transition hover:scale-110 ${
                                   (o.labelColor || "transparent") === c.value
-                                    ? "border-white ring-2 ring-brand"
-                                    : "border-border/40 hover:border-white/60"
+                                    ? "ring-2 ring-brand"
+                                    : "opacity-80 hover:opacity-100"
                                 }`}
                                 style={{ backgroundColor: c.value === "transparent" ? "transparent" : c.value }}
                               >
@@ -758,32 +764,32 @@ export default function OrdersPage() {
                       </td>
 
                       {/* 4. Item Name */}
-                      <td className="py-2.5 px-2 text-text/90 max-w-[200px] truncate" title={displayItem}>
-                        {displayItem}
+                      <td className="py-2.5 px-2 text-text font-medium min-w-[180px] max-w-[280px]" title={displayItem}>
+                        <div className="line-clamp-2 leading-snug">{displayItem}</div>
                       </td>
 
                       {/* 5. Quantity */}
-                      <td className="py-2.5 px-2 text-center font-semibold text-text">
+                      <td className="py-2.5 px-1 text-center font-semibold text-text">
                         {qty}
                       </td>
 
                       {/* 6. Price */}
-                      <td className="py-2.5 px-2 text-right font-bold text-good whitespace-nowrap">
+                      <td className="py-2.5 px-1.5 text-right font-bold text-good whitespace-nowrap">
                         {fmtPKR(o.totalPrice)}
                       </td>
 
                       {/* 7. Confirmation */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td className="py-2.5 px-1 text-center">
                         <button
                           onClick={() =>
                             updateField(o.id, {
                               confirmationStatus: isConfirmed ? "pending" : "confirmed",
                             })
                           }
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold transition ${
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border-0 transition ${
                             isConfirmed
-                              ? "bg-good/20 text-good border border-good/30"
-                              : "bg-warn/20 text-warn border border-warn/30 hover:bg-warn/30"
+                              ? "bg-good/20 text-good"
+                              : "bg-warn/20 text-warn hover:bg-warn/30"
                           }`}
                         >
                           {isConfirmed ? "✓ Confirmed" : "⏳ Pending"}
@@ -791,11 +797,11 @@ export default function OrdersPage() {
                       </td>
 
                       {/* 8. Payment (Type Only: COD / Online Payment) */}
-                      <td className="py-2.5 px-2">
+                      <td className="py-2.5 px-1">
                         <select
                           value={payMethod === "Online Payment" ? "Online Payment" : "COD"}
                           onChange={(e) => updateField(o.id, { paymentMethod: e.target.value })}
-                          className="bg-panel2 text-xs font-semibold text-text border border-border rounded px-1.5 py-0.5 focus:outline-none focus:border-brand cursor-pointer"
+                          className="bg-panel2/70 text-xs font-semibold text-text border-0 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
                         >
                           <option value="COD">COD</option>
                           <option value="Online Payment">Online Payment</option>
@@ -803,34 +809,34 @@ export default function OrdersPage() {
                       </td>
 
                       {/* 9. Slip Print (Checkbox Only) */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td className="py-2.5 px-1 text-center">
                         <input
                           type="checkbox"
                           checked={!!o.slipPrinted}
                           onChange={(e) => updateField(o.id, { slipPrinted: e.target.checked })}
-                          className="h-4 w-4 rounded border-border bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
+                          className="h-4 w-4 rounded border-0 bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
                           title="Checkmark if slip is printed"
                         />
                       </td>
 
                       {/* 10. Packed */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td className="py-2.5 px-1 text-center">
                         <input
                           type="checkbox"
                           checked={!!o.isPacked}
                           onChange={(e) => updateField(o.id, { isPacked: e.target.checked })}
-                          className="h-4 w-4 rounded border-border bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
+                          className="h-4 w-4 rounded border-0 bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
                         />
                       </td>
 
                       {/* 11. Courier Hand */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td className="py-2.5 px-1 text-center">
                         <button
                           onClick={() => updateField(o.id, { isCourierHanded: !o.isCourierHanded })}
-                          className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold border-0 transition ${
                             o.isCourierHanded
-                              ? "bg-accent/20 text-accent border border-accent/40"
-                              : "bg-panel2 text-muted border border-border hover:text-text"
+                              ? "bg-accent/20 text-accent"
+                              : "bg-panel2/60 text-muted hover:text-text"
                           }`}
                         >
                           {o.isCourierHanded ? "🚚 Dispatched" : "Handover"}
@@ -838,7 +844,7 @@ export default function OrdersPage() {
                       </td>
 
                       {/* 12. Contact No (Auto-fetched from Shopify, formatted 03xx + Inline Editable) */}
-                      <td className="py-2.5 px-2">
+                      <td className="py-2.5 px-1.5">
                         <input
                           type="text"
                           defaultValue={formatPhone(o.customerPhone)}
@@ -850,12 +856,12 @@ export default function OrdersPage() {
                               updateField(o.id, { customerPhone: formatted });
                             }
                           }}
-                          className="bg-transparent hover:bg-panel2/60 focus:bg-panel2 text-xs text-text border border-transparent hover:border-border/60 focus:border-brand rounded px-1.5 py-1 w-full focus:outline-none transition"
+                          className="bg-transparent hover:bg-panel2/50 focus:bg-panel2 text-xs text-text border-0 outline-none rounded px-1.5 py-1 w-full transition"
                         />
                       </td>
 
-                      {/* 13. Remarks (Inline Manual Edit) */}
-                      <td className="py-2.5 px-2">
+                      {/* 13. Remarks (Inline Manual Edit - Borderless) */}
+                      <td className="py-2.5 px-2 min-w-[150px]">
                         <input
                           type="text"
                           defaultValue={o.remarks || ""}
@@ -865,7 +871,7 @@ export default function OrdersPage() {
                               updateField(o.id, { remarks: e.target.value });
                             }
                           }}
-                          className="bg-transparent hover:bg-panel2/60 focus:bg-panel2 text-xs text-text border border-transparent hover:border-border/60 focus:border-brand rounded px-1.5 py-1 w-full focus:outline-none transition"
+                          className="bg-panel2/40 hover:bg-panel2 focus:bg-panel2 text-xs text-text border-0 outline-none rounded-lg px-2.5 py-1 w-full transition placeholder:text-muted/40"
                         />
                       </td>
 
@@ -874,7 +880,7 @@ export default function OrdersPage() {
                         <select
                           value={o.deliveryStatus || "pending under ATC"}
                           onChange={(e) => updateField(o.id, { deliveryStatus: e.target.value })}
-                          className="bg-panel2 text-xs text-text border border-border rounded px-1.5 py-1 focus:outline-none focus:border-brand cursor-pointer"
+                          className="bg-panel2/70 text-xs text-text border-0 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
                         >
                           {DELIVERY_STATUSES.map((st) => (
                             <option key={st} value={st}>
@@ -886,12 +892,9 @@ export default function OrdersPage() {
 
                       {/* 15 & 16. Actions */}
                       <td className="py-2.5 px-2 text-right whitespace-nowrap">
-                        <button className="text-brand-light hover:underline text-xs" onClick={() => setEdit(o)}>
-                          Edit
-                        </button>
                         {tab === "active" ? (
                           <button
-                            className="text-muted hover:text-text hover:underline text-xs ml-2"
+                            className="text-muted hover:text-text hover:underline text-xs"
                             onClick={() => setArchived(o.id, true)}
                             title="Archive kar do"
                           >
@@ -900,7 +903,7 @@ export default function OrdersPage() {
                         ) : (
                           o.archived && (
                             <button
-                              className="text-brand-light hover:underline text-xs ml-2"
+                              className="text-brand-light hover:underline text-xs"
                               onClick={() => setArchived(o.id, false)}
                             >
                               Restore

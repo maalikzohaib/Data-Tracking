@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import AppShell from "@/components/AppShell";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -27,13 +28,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body className="font-sans antialiased">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 min-w-0 lg:ml-64">
-            <div className="mx-auto max-w-[1920px] w-full px-4 py-6 lg:px-6">{children}</div>
-          </main>
-        </div>
+      <body className="font-sans antialiased bg-bg text-text">
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );
