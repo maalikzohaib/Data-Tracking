@@ -744,16 +744,11 @@ export default function OrdersPage() {
                         {fmtDate(o.shopifyCreatedAt)}
                       </td>
 
-                      {/* 2. Order No # + Workflow Section Badge */}
+                      {/* 2. Order No # */}
                       <td className="py-2.5 px-2 font-bold text-text whitespace-nowrap">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5">
-                            <span>{o.orderNumber || "—"}</span>
-                            {o.source === "manual" && <span className="text-[10px] text-brand-light" title="Manual order">✍</span>}
-                          </div>
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold w-max ${section.badgeStyle}`}>
-                            {section.icon} {section.label}
-                          </span>
+                        <div className="flex items-center gap-1.5">
+                          <span>{o.orderNumber || "—"}</span>
+                          {o.source === "manual" && <span className="text-[10px] text-brand-light" title="Manual order">✍</span>}
                         </div>
                       </td>
 

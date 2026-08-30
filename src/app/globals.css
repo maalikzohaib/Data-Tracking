@@ -45,9 +45,14 @@
 
 html,
 body {
+  font-family: Arial, Helvetica, sans-serif;
   background-color: var(--bg);
   color: var(--text);
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: "Times New Roman", Times, serif;
 }
 
 /* Subtle ambient background glow */

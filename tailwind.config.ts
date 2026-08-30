@@ -25,8 +25,8 @@ const config: Config = {
         warn: "var(--warn)",
       },
       fontFamily: {
-        sans: ["var(--font-body)", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        display: ["var(--font-display)", "var(--font-body)", "sans-serif"],
+        sans: ["Arial", "Helvetica", "sans-serif"],
+        display: ["'Times New Roman'", "Times", "serif"],
       },
       boxShadow: {
         glow: "0 0 0 1px rgba(16,185,129,0.2), 0 8px 30px rgba(16,185,129,0.12)",
