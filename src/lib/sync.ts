@@ -15,6 +15,25 @@ function paymentMethod(o: ShopifyOrder): string {
   return gws;
 }
 
+/** Normalize phone: +923xx → 03xx, 923xx → 03xx */
+function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let p = raw.replace(/[\s\-().]/g, "");
+  if (p.startsWith("+92")) p = "0" + p.slice(3);
+  else if (p.startsWith("92") && p.length >= 12) p = "0" + p.slice(2);
+  if (!p.startsWith("0")) p = "0" + p;
+  return p;
+}
+
+/** Map Shopify fulfillment_status → deliveryStatus */
+function mapDeliveryStatus(fulfillment: string | null | undefined): string {
+  if (!fulfillment) return "pending under ATC";
+  const f = fulfillment.toLowerCase();
+  if (f === "fulfilled") return "delivered";
+  if (f === "partial") return "in transit";
+  return "pending under ATC";
+}
+
 // Upsert a single Shopify order into the DB (used by sync + webhook).
 export async function upsertOrder(o: ShopifyOrder): Promise<void> {
   const shopifyId = String(o.id);
@@ -22,6 +41,15 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
   const customerName = o.customer
     ? `${o.customer.first_name ?? ""} ${o.customer.last_name ?? ""}`.trim()
     : null;
+  const customerPhone = normalizePhone(
+    o.phone ||
+    o.customer?.phone ||
+    o.shipping_address?.phone ||
+    o.billing_address?.phone ||
+    null
+  );
+  const itemNames = o.line_items.map((li) => li.title).join(", ");
+  const deliveryStatus = mapDeliveryStatus(o.fulfillment_status);
 
   // COGS: sum(line item qty * product buyPrice) — matched by SKU.
   const skus = o.line_items.map((li) => li.sku).filter(Boolean) as string[];
@@ -44,7 +72,9 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       shopifyId,
       orderNumber: o.name ?? String(o.order_number),
       customerName,
+      customerPhone,
       customerCity: o.shipping_address?.city ?? null,
+      itemName: itemNames || null,
       totalPrice: num(o.total_price),
       subtotalPrice: num(o.subtotal_price),
       totalDiscount: num(o.total_discounts),
@@ -53,6 +83,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       financialStatus: o.financial_status,
       fulfillmentStatus: o.fulfillment_status,
       paymentMethod: paymentMethod(o),
+      deliveryStatus,
       itemCount,
       cogs,
       cancelled: !!o.cancelled_at,
@@ -70,7 +101,9 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
     update: {
       orderNumber: o.name ?? String(o.order_number),
       customerName,
+      customerPhone,
       customerCity: o.shipping_address?.city ?? null,
+      itemName: itemNames || null,
       totalPrice: num(o.total_price),
       subtotalPrice: num(o.subtotal_price),
       totalDiscount: num(o.total_discounts),
@@ -78,6 +111,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       financialStatus: o.financial_status,
       fulfillmentStatus: o.fulfillment_status,
       paymentMethod: paymentMethod(o),
+      deliveryStatus,
       itemCount,
       cogs,
       cancelled: !!o.cancelled_at,
@@ -123,19 +157,21 @@ export async function syncShopifyProducts(): Promise<number> {
   for (const p of products) {
     for (const v of p.variants) {
       const shopifyVariantId = String(v.id);
+      const cleanSku = v.sku?.trim() || null;
       count++;
       await prisma.product.upsert({
         where: { shopifyId: shopifyVariantId },
         create: {
           shopifyId: shopifyVariantId,
           title: p.variants.length > 1 ? `${p.title} — ${v.title}` : p.title,
-          sku: v.sku || null,
+          sku: cleanSku,
           sellPrice: num(v.price),
           stock: v.inventory_quantity ?? 0,
           // buyPrice manual rehta hai — sync par overwrite nahi karte.
         },
         update: {
           title: p.variants.length > 1 ? `${p.title} — ${v.title}` : p.title,
+          sku: cleanSku,
           sellPrice: num(v.price),
           stock: v.inventory_quantity ?? 0,
         },

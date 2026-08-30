@@ -32,6 +32,16 @@ model Order {
   courier        String?  // TCS, Leopards, M&P, PostEx — manual
   trackingId     String?  // courier tracking number — optional
   trackingUrl    String?  // tracking link — optional
+  customerPhone  String?  // Contact Number
+  itemName       String?  // Item Name override / display
+  confirmationStatus String? @default("pending") // confirmed | pending
+  slipPrinted    Boolean  @default(false) // Slip printed
+  isPacked       Boolean  @default(false) // Order is packed
+  isCourierHanded Boolean @default(false) // Order is delivered to courier
+  remarks        String?  // Order remarks
+  specialDetails String?  // Any special details
+  deliveryStatus String?  @default("pending under ATC") // delivered | pending under ATC | in transit
+  labelColor     String?  @default("#transparent") // row highlight color for visual categorization
   archived       Boolean  @default(false) // manually archive (clutter kam karne ke liye)
   cancelled      Boolean  @default(false)
   shopifyCreatedAt DateTime
@@ -64,7 +74,7 @@ model Product {
   id            String   @id @default(cuid())
   shopifyId     String?  @unique
   title         String
-  sku           String?  @unique
+  sku           String?
   buyPrice      Float    @default(0) // per unit cost (COGS ke liye) — manual
   sellPrice     Float    @default(0)
   stock         Int      @default(0)

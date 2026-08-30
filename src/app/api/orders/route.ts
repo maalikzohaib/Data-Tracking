@@ -20,14 +20,23 @@ export async function GET(req: Request) {
 // ------------------------------------------------------------
 const createSchema = z.object({
   customerName: z.string().min(1),
+  customerPhone: z.string().optional(),
   customerCity: z.string().optional(),
+  itemName: z.string().optional(),
   totalPrice: z.number().nonnegative(), // sell price
   cogs: z.number().nonnegative().optional(), // cost
   stage: z.enum(["processing", "shipped", "completed", "cancelled"]).default("processing"),
+  confirmationStatus: z.string().optional(),
   shippingAdvance: z.number().nonnegative().optional(),
   courier: z.string().optional(),
   paymentMethod: z.string().optional(),
   itemCount: z.number().int().positive().optional(),
+  isPacked: z.boolean().optional(),
+  isCourierHanded: z.boolean().optional(),
+  remarks: z.string().optional(),
+  specialDetails: z.string().optional(),
+  deliveryStatus: z.string().optional(),
+  labelColor: z.string().optional(),
   note: z.string().optional(),
   happenedAt: z.string().optional(),
 });
@@ -123,17 +132,25 @@ export async function POST(req: Request) {
       source: "manual",
       orderNumber,
       customerName: d.customerName,
+      customerPhone: d.customerPhone,
       customerCity: d.customerCity,
+      itemName: d.itemName,
       totalPrice: d.totalPrice,
       subtotalPrice: d.totalPrice,
       cogs: d.cogs ?? 0,
       stage: d.stage,
       financialStatus,
       fulfillmentStatus: d.stage === "completed" ? "fulfilled" : "unfulfilled",
+      confirmationStatus: d.confirmationStatus ?? "pending",
       paymentMethod: d.paymentMethod ?? "COD",
       itemCount: d.itemCount ?? 1,
       shippingAdvance: d.shippingAdvance ?? 0,
       courier: d.courier,
+      isPacked: d.isPacked ?? false,
+      isCourierHanded: d.isCourierHanded ?? false,
+      remarks: d.remarks,
+      specialDetails: d.specialDetails,
+      deliveryStatus: d.deliveryStatus ?? "pending under ATC",
       cancelled,
       shopifyCreatedAt: when,
     },
@@ -152,17 +169,31 @@ export async function POST(req: Request) {
 }
 
 // ------------------------------------------------------------
-//  Update order (stage / shipping advance / courier / prices)
+//  Update order (stage / shipping advance / courier / prices / status)
 // ------------------------------------------------------------
 const patchSchema = z.object({
   id: z.string().min(1),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerCity: z.string().optional(),
+  itemName: z.string().optional(),
   stage: z.enum(["processing", "shipped", "completed", "cancelled"]).optional(),
+  confirmationStatus: z.string().optional(),
+  financialStatus: z.string().optional(),
+  paymentMethod: z.string().optional(),
   shippingAdvance: z.number().nonnegative().optional(),
   courier: z.string().optional(),
   totalPrice: z.number().nonnegative().optional(),
   cogs: z.number().nonnegative().optional(),
   trackingId: z.string().optional(),
   trackingUrl: z.string().optional(),
+  slipPrinted: z.boolean().optional(),
+  isPacked: z.boolean().optional(),
+  isCourierHanded: z.boolean().optional(),
+  remarks: z.string().optional(),
+  specialDetails: z.string().optional(),
+  deliveryStatus: z.string().optional(),
+  labelColor: z.string().optional(),
   archived: z.boolean().optional(),
 });
 
@@ -172,7 +203,31 @@ export async function PATCH(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { id, stage, shippingAdvance, courier, totalPrice, cogs, trackingId, trackingUrl, archived } = parsed.data;
+  const {
+    id,
+    customerName,
+    customerPhone,
+    customerCity,
+    itemName,
+    stage,
+    confirmationStatus,
+    financialStatus,
+    paymentMethod,
+    shippingAdvance,
+    courier,
+    totalPrice,
+    cogs,
+    trackingId,
+    trackingUrl,
+    slipPrinted,
+    isPacked,
+    isCourierHanded,
+    remarks,
+    specialDetails,
+    deliveryStatus,
+    labelColor,
+    archived,
+  } = parsed.data;
 
   const stageData = stage
     ? {
@@ -186,12 +241,26 @@ export async function PATCH(req: Request) {
     where: { id },
     data: {
       ...stageData,
+      ...(customerName !== undefined ? { customerName } : {}),
+      ...(customerPhone !== undefined ? { customerPhone } : {}),
+      ...(customerCity !== undefined ? { customerCity } : {}),
+      ...(itemName !== undefined ? { itemName } : {}),
+      ...(confirmationStatus !== undefined ? { confirmationStatus } : {}),
+      ...(financialStatus !== undefined ? { financialStatus } : {}),
+      ...(paymentMethod !== undefined ? { paymentMethod } : {}),
       ...(shippingAdvance !== undefined ? { shippingAdvance } : {}),
       ...(courier !== undefined ? { courier } : {}),
       ...(totalPrice !== undefined ? { totalPrice } : {}),
       ...(cogs !== undefined ? { cogs } : {}),
       ...(trackingId !== undefined ? { trackingId } : {}),
       ...(trackingUrl !== undefined ? { trackingUrl } : {}),
+      ...(slipPrinted !== undefined ? { slipPrinted } : {}),
+      ...(isPacked !== undefined ? { isPacked } : {}),
+      ...(isCourierHanded !== undefined ? { isCourierHanded } : {}),
+      ...(remarks !== undefined ? { remarks } : {}),
+      ...(specialDetails !== undefined ? { specialDetails } : {}),
+      ...(deliveryStatus !== undefined ? { deliveryStatus } : {}),
+      ...(labelColor !== undefined ? { labelColor } : {}),
       ...(archived !== undefined ? { archived } : {}),
     },
   });

@@ -5,12 +5,22 @@ import { PageHeader, Card, Pill, StatCard, EmptyState } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
 import { fmtPKR, fmtDate } from "@/lib/format";
 
+type LineItem = {
+  id: string;
+  title: string;
+  quantity: number;
+  price: number;
+  sku: string | null;
+};
+
 type Order = {
   id: string;
   source: string;
   orderNumber: string | null;
   customerName: string | null;
+  customerPhone: string | null;
   customerCity: string | null;
+  itemName: string | null;
   totalPrice: number;
   itemCount: number;
   cogs: number;
@@ -19,16 +29,48 @@ type Order = {
   courier: string | null;
   trackingId: string | null;
   trackingUrl: string | null;
+  confirmationStatus: string | null;
+  slipPrinted: boolean;
+  isPacked: boolean;
+  isCourierHanded: boolean;
+  remarks: string | null;
+  specialDetails: string | null;
+  deliveryStatus: string | null;
+  labelColor: string | null;
   archived: boolean;
   cancelled: boolean;
   financialStatus: string | null;
   fulfillmentStatus: string | null;
   paymentMethod: string | null;
   shopifyCreatedAt: string;
+  lineItems?: LineItem[];
 };
 
 const COURIERS = ["", "TCS", "Leopards", "M&P", "PostEx", "Trax", "Daewoo", "Other"];
 const STAGES = ["processing", "shipped", "completed", "cancelled"] as const;
+
+// Color palette for order row labels
+const COLOR_OPTIONS = [
+  { label: "None",    value: "transparent" },
+  { label: "Green",   value: "#22c55e" },
+  { label: "Orange",  value: "#f97316" },
+  { label: "Yellow",  value: "#eab308" },
+  { label: "Red",     value: "#ef4444" },
+  { label: "Blue",    value: "#3b82f6" },
+  { label: "Purple",  value: "#a855f7" },
+  { label: "Pink",    value: "#ec4899" },
+  { label: "Cyan",    value: "#06b6d4" },
+];
+
+/** Normalize phone: +923xx → 03xx, 923xx → 03xx, already 03xx → as-is */
+function formatPhone(raw: string | null | undefined): string {
+  if (!raw) return "";
+  let p = raw.replace(/[\s\-().]/g, "");
+  if (p.startsWith("+92")) p = "0" + p.slice(3);
+  else if (p.startsWith("92") && p.length >= 12) p = "0" + p.slice(2);
+  if (!p.startsWith("0")) p = "0" + p;
+  return p;
+}
 
 const STAGE_LABEL: Record<string, string> = {
   processing: "Processing",
@@ -37,7 +79,15 @@ const STAGE_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-// Courier tracking page (jahan tracking ID daal ke check karte hain).
+const DELIVERY_STATUSES = [
+  "pending under ATC",
+  "delivered",
+  "in transit",
+  "out for delivery",
+  "returned",
+  "cancelled",
+];
+
 const COURIER_TRACK_URL: Record<string, string> = {
   TCS: "https://www.tcsexpress.com/track/",
   Leopards: "https://www.leopardscourier.com/tracking",
@@ -49,27 +99,35 @@ const COURIER_TRACK_URL: Record<string, string> = {
 
 const emptyForm = {
   customerName: "",
+  customerPhone: "",
   customerCity: "",
+  itemName: "",
   totalPrice: "",
   cogs: "",
   shippingAdvance: "",
   courier: "",
   stage: "processing",
+  confirmationStatus: "confirmed",
   paymentMethod: "COD",
+  deliveryStatus: "pending under ATC",
   itemCount: "1",
+  remarks: "",
+  specialDetails: "",
 };
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState<"active" | "archive">("active");
+  const [tab, setTab] = useState<"active" | "courierHanded" | "delivered" | "archive">("active");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [edit, setEdit] = useState<Order | null>(null);
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null); // orderId or null
 
   const load = () =>
     apiGet<{ orders: Order[] }>("/api/orders?limit=300")
@@ -103,14 +161,20 @@ export default function OrdersPage() {
     setSaving(true);
     await apiSend("/api/orders", "POST", {
       customerName: form.customerName,
+      customerPhone: form.customerPhone || undefined,
       customerCity: form.customerCity || undefined,
+      itemName: form.itemName || undefined,
       totalPrice: parseFloat(form.totalPrice),
       cogs: form.cogs ? parseFloat(form.cogs) : 0,
       shippingAdvance: form.shippingAdvance ? parseFloat(form.shippingAdvance) : 0,
       courier: form.courier || undefined,
       stage: form.stage,
-      paymentMethod: form.paymentMethod || undefined,
+      confirmationStatus: form.confirmationStatus,
+      paymentMethod: form.paymentMethod || "COD",
+      deliveryStatus: form.deliveryStatus || "pending under ATC",
       itemCount: form.itemCount ? parseInt(form.itemCount, 10) : 1,
+      remarks: form.remarks || undefined,
+      specialDetails: form.specialDetails || undefined,
     });
     setForm(emptyForm);
     setShowForm(false);
@@ -123,17 +187,36 @@ export default function OrdersPage() {
     setSaving(true);
     await apiSend("/api/orders", "PATCH", {
       id: edit.id,
+      customerName: edit.customerName || "",
+      customerPhone: edit.customerPhone || "",
+      customerCity: edit.customerCity || "",
+      itemName: edit.itemName || "",
       stage: edit.stage || undefined,
+      confirmationStatus: edit.confirmationStatus || "pending",
+      paymentMethod: edit.paymentMethod || "COD",
       courier: edit.courier || undefined,
       shippingAdvance: edit.shippingAdvance || 0,
       totalPrice: edit.totalPrice,
       cogs: edit.cogs,
       trackingId: edit.trackingId || "",
       trackingUrl: edit.trackingUrl || "",
+      remarks: edit.remarks || "",
+      specialDetails: edit.specialDetails || "",
+      deliveryStatus: edit.deliveryStatus || "pending under ATC",
+      isPacked: edit.isPacked,
+      isCourierHanded: edit.isCourierHanded,
     });
     setEdit(null);
     await load();
     setSaving(false);
+  }
+
+  async function updateField(id: string, patch: Partial<Order>) {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, ...patch } : o))
+    );
+    await apiSend("/api/orders", "PATCH", { id, ...patch });
+    load();
   }
 
   async function setArchived(id: string, archived: boolean) {
@@ -146,41 +229,65 @@ export default function OrdersPage() {
     load();
   }
 
-  // Archive tab = manually archived YA cancelled/voided orders.
+  // === 4-Section Filter Logic ===
+  // Archive: cancelled, voided, or manually archived
   const isArchived = (o: Order) =>
     o.archived || o.cancelled || o.stage === "cancelled" || o.financialStatus === "voided";
+
+  // Delivered: deliveryStatus === "delivered" (and not archived)
+  const isDelivered = (o: Order) =>
+    !isArchived(o) && o.deliveryStatus === "delivered";
+
+  // Courier Handed: isCourierHanded === true, but NOT yet delivered, NOT archived
+  const isCourierHanded = (o: Order) =>
+    !isArchived(o) && !isDelivered(o) && !!o.isCourierHanded;
+
+  // Active: everything else (not courier handed, not delivered, not archived)
+  const isActive = (o: Order) =>
+    !isArchived(o) && !isDelivered(o) && !isCourierHanded(o);
 
   const bySearch = (o: Order) =>
     !q ||
     o.orderNumber?.toLowerCase().includes(q.toLowerCase()) ||
     o.customerName?.toLowerCase().includes(q.toLowerCase()) ||
-    o.customerCity?.toLowerCase().includes(q.toLowerCase());
+    o.customerPhone?.toLowerCase().includes(q.toLowerCase()) ||
+    o.itemName?.toLowerCase().includes(q.toLowerCase()) ||
+    o.customerCity?.toLowerCase().includes(q.toLowerCase()) ||
+    o.remarks?.toLowerCase().includes(q.toLowerCase());
 
-  const activeOrders = orders.filter((o) => !isArchived(o));
+  const activeOrders = orders.filter(isActive);
+  const courierHandedOrders = orders.filter(isCourierHanded);
+  const deliveredOrders = orders.filter(isDelivered);
   const archivedOrders = orders.filter(isArchived);
-  const shown = (tab === "active" ? activeOrders : archivedOrders).filter(bySearch);
 
-  // Stats sirf active orders pe (clutter kam).
+  const shownMap = {
+    active: activeOrders,
+    courierHanded: courierHandedOrders,
+    delivered: deliveredOrders,
+    archive: archivedOrders,
+  };
+  const shown = shownMap[tab].filter(bySearch);
+
   const totalSales = activeOrders.reduce((s, o) => s + o.totalPrice, 0);
   const completedSales = activeOrders
-    .filter((o) => o.stage === "completed" || o.financialStatus === "paid")
+    .filter((o) => o.stage === "completed" || o.financialStatus === "paid" || o.deliveryStatus === "delivered")
     .reduce((s, o) => s + o.totalPrice, 0);
   const totalAdvance = activeOrders.reduce((s, o) => s + (o.shippingAdvance || 0), 0);
   const pendingCount = activeOrders.filter(
-    (o) => o.stage !== "completed" && o.financialStatus !== "paid"
+    (o) => o.deliveryStatus !== "delivered" && o.financialStatus !== "paid"
   ).length;
 
   return (
     <>
       <PageHeader
         title="Orders / Sales"
-        subtitle="Shopify se synced + manual orders — dono ek jagah"
+        subtitle="Shopify se synced + manual orders — full-width 16-column view"
         action={
           <div className="flex flex-wrap gap-2 items-center">
             {syncMsg && <span className="text-xs text-muted">{syncMsg}</span>}
             <input
-              className="input max-w-[160px]"
-              placeholder="Search…"
+              className="input max-w-[180px]"
+              placeholder="Search order, name, phone…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -204,14 +311,22 @@ export default function OrdersPage() {
       {/* New order form */}
       {showForm && (
         <Card title="Naya Manual Order" className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="label">Customer Name *</label>
               <input className="input" placeholder="e.g. Ali Khan" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
             </div>
             <div>
+              <label className="label">Contact No</label>
+              <input className="input" placeholder="0300-1234567" value={form.customerPhone} onChange={(e) => setForm({ ...form, customerPhone: e.target.value })} />
+            </div>
+            <div>
               <label className="label">City</label>
               <input className="input" placeholder="e.g. Lahore" value={form.customerCity} onChange={(e) => setForm({ ...form, customerCity: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Item Name</label>
+              <input className="input" placeholder="e.g. Black Leather Wallet" value={form.itemName} onChange={(e) => setForm({ ...form, itemName: e.target.value })} />
             </div>
             <div>
               <label className="label">Sell Price (PKR) *</label>
@@ -222,14 +337,28 @@ export default function OrdersPage() {
               <input className="input" type="number" placeholder="0" value={form.cogs} onChange={(e) => setForm({ ...form, cogs: e.target.value })} />
             </div>
             <div>
-              <label className="label">Items</label>
+              <label className="label">Qty</label>
               <input className="input" type="number" value={form.itemCount} onChange={(e) => setForm({ ...form, itemCount: e.target.value })} />
             </div>
             <div>
-              <label className="label">Stage</label>
-              <select className="input" value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
-                {STAGES.map((s) => (
-                  <option key={s} value={s}>{STAGE_LABEL[s]}</option>
+              <label className="label">Confirmation</label>
+              <select className="input" value={form.confirmationStatus} onChange={(e) => setForm({ ...form, confirmationStatus: e.target.value })}>
+                <option value="confirmed">Confirmed</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Payment Type</label>
+              <select className="input" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
+                <option value="COD">COD</option>
+                <option value="Online Payment">Online Payment</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Delivery Status</label>
+              <select className="input" value={form.deliveryStatus} onChange={(e) => setForm({ ...form, deliveryStatus: e.target.value })}>
+                {DELIVERY_STATUSES.map((st) => (
+                  <option key={st} value={st}>{st}</option>
                 ))}
               </select>
             </div>
@@ -246,14 +375,12 @@ export default function OrdersPage() {
               <input className="input" type="number" placeholder="0" value={form.shippingAdvance} onChange={(e) => setForm({ ...form, shippingAdvance: e.target.value })} />
             </div>
             <div>
-              <label className="label">Payment Method</label>
-              <select className="input" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
-                <option>COD</option>
-                <option>Prepaid</option>
-                <option>Bank Transfer</option>
-                <option>JazzCash</option>
-                <option>EasyPaisa</option>
-              </select>
+              <label className="label">Remarks</label>
+              <input className="input" placeholder="e.g. Call before delivery" value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="label">Special Details</label>
+              <input className="input" placeholder="e.g. Gift wrap requested" value={form.specialDetails} onChange={(e) => setForm({ ...form, specialDetails: e.target.value })} />
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4">
@@ -268,95 +395,262 @@ export default function OrdersPage() {
       {/* Tabs */}
       <div className="inline-flex rounded-xl bg-panel2 border border-border p-1 mb-4">
         {([
-          { k: "active", l: `Active (${activeOrders.length})` },
-          { k: "archive", l: `Archive (${archivedOrders.length})` },
-        ] as const).map((t) => (
+          { k: "active" as const, l: `Active (${activeOrders.length})`, icon: "🛒", color: "linear-gradient(135deg,#10b981,#059669)" },
+          { k: "courierHanded" as const, l: `Courier Handed (${courierHandedOrders.length})`, icon: "🚚", color: "linear-gradient(135deg,#f59e0b,#d97706)" },
+          { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: "✅", color: "linear-gradient(135deg,#3b82f6,#2563eb)" },
+          { k: "archive" as const, l: `Archive (${archivedOrders.length})`, icon: "📦", color: "linear-gradient(135deg,#6b7280,#4b5563)" },
+        ]).map((t) => (
           <button
             key={t.k}
             onClick={() => setTab(t.k)}
             className={`px-4 py-1.5 text-xs font-medium rounded-lg transition ${
               tab === t.k ? "text-white" : "text-muted hover:text-text"
             }`}
-            style={tab === t.k ? { backgroundImage: "linear-gradient(135deg,#10b981,#059669)" } : undefined}
+            style={tab === t.k ? { backgroundImage: t.color } : undefined}
           >
-            {t.l}
+            {t.icon} {t.l}
           </button>
         ))}
       </div>
 
-      <Card>
+      <Card className="!p-3 overflow-hidden">
         {loading ? (
           <div className="text-muted text-sm py-10 text-center">Loading…</div>
         ) : shown.length === 0 ? (
-          <EmptyState text={tab === "active" ? "Koi active order nahi." : "Archive khali hai."} />
+          <EmptyState text={
+            tab === "active" ? "Koi active order nahi." :
+            tab === "courierHanded" ? "Koi courier handed order nahi." :
+            tab === "delivered" ? "Abhi koi delivered order nahi." :
+            "Archive khali hai."
+          } />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs text-left border-collapse min-w-[1500px]">
               <thead>
-                <tr className="text-left text-xs text-muted border-b border-border">
-                  <th className="py-3 px-2">Order</th>
-                  <th className="py-3 px-2">Customer</th>
-                  <th className="py-3 px-2">City</th>
-                  <th className="py-3 px-2">Courier</th>
-                  <th className="py-3 px-2 text-right">Advance</th>
-                  <th className="py-3 px-2">Stage</th>
-                  <th className="py-3 px-2 text-right">Sell</th>
-                  <th className="py-3 px-2 text-right">Profit</th>
-                  <th className="py-3 px-2 text-right">Date</th>
-                  <th className="py-3 px-2"></th>
+                <tr className="bg-panel2/80 text-muted uppercase font-semibold text-[11px] border-b border-border tracking-wider">
+                  <th className="py-3 px-1 text-center whitespace-nowrap min-w-[32px]"></th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[95px]">Date</th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[90px]">Order No #</th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[130px]">Name</th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[160px]">Item Name</th>
+                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[45px]">Qty</th>
+                  <th className="py-3 px-2 text-right whitespace-nowrap min-w-[85px]">Price</th>
+                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[105px]">Confirmation</th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[140px]">Payment</th>
+                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[75px]">Slip Print</th>
+                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[70px]">Packed</th>
+                  <th className="py-3 px-2 text-center whitespace-nowrap min-w-[100px]">Courier Hand</th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[125px]">Contact No</th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[135px]">Remarks</th>
+                  <th className="py-3 px-2 whitespace-nowrap min-w-[135px]">Status</th>
+                  <th className="py-3 px-2 text-right whitespace-nowrap min-w-[90px]">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/40">
                 {shown.map((o) => {
-                  const profit = o.totalPrice - (o.cogs || 0) - (o.shippingAdvance || 0);
-                  const trackHref =
-                    o.trackingUrl || (o.courier ? COURIER_TRACK_URL[o.courier] : undefined);
+                  const displayItem =
+                    o.itemName ||
+                    (o.lineItems && o.lineItems.length > 0
+                      ? o.lineItems.map((li) => li.title).join(", ")
+                      : "—");
+                  const qty =
+                    o.itemCount ||
+                    (o.lineItems && o.lineItems.length > 0
+                      ? o.lineItems.reduce((s, li) => s + li.quantity, 0)
+                      : 1);
+                  const isConfirmed = o.confirmationStatus === "confirmed";
+                  const payMethod = o.paymentMethod || "COD";
+                  const rowColor = o.labelColor && o.labelColor !== "transparent" && o.labelColor !== "#transparent" ? o.labelColor : null;
+
                   return (
-                    <tr key={o.id} className="border-b border-border/50 hover:bg-panel2/50">
-                      <td className="py-3 px-2 font-medium">
-                        {o.orderNumber || "—"}
-                        {o.source === "manual" && <span className="ml-1 text-[10px] text-muted">✍</span>}
-                      </td>
-                      <td className="py-3 px-2">{o.customerName || "—"}</td>
-                      <td className="py-3 px-2 text-muted">{o.customerCity || "—"}</td>
-                      <td className="py-3 px-2">
-                        {o.courier ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="pill bg-panel2 text-muted">{o.courier}</span>
-                            {trackHref && (
-                              <a
-                                href={trackHref}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-brand-light text-xs hover:underline"
-                                title={o.trackingId || "Track"}
+                    <tr
+                      key={o.id}
+                      className="hover:bg-panel2/40 transition-colors"
+                      style={rowColor ? { backgroundColor: `${rowColor}18` } : undefined}
+                    >
+                      {/* Color Label */}
+                      <td className="py-2.5 px-1 text-center relative">
+                        <button
+                          onClick={() => setColorPickerOpen(colorPickerOpen === o.id ? null : o.id)}
+                          className="w-5 h-5 rounded border-2 border-border/60 hover:border-brand cursor-pointer transition inline-block"
+                          style={{ backgroundColor: rowColor || "transparent" }}
+                          title="Set order color"
+                        />
+                        {colorPickerOpen === o.id && (
+                          <div className="absolute left-6 top-1 z-50 bg-panel border border-border rounded-lg shadow-xl p-2 flex gap-1.5 flex-wrap w-[140px]">
+                            {COLOR_OPTIONS.map((c) => (
+                              <button
+                                key={c.value}
+                                title={c.label}
+                                onClick={() => {
+                                  updateField(o.id, { labelColor: c.value } as Partial<Order>);
+                                  setColorPickerOpen(null);
+                                }}
+                                className={`w-6 h-6 rounded-full border-2 transition hover:scale-110 ${
+                                  (o.labelColor || "transparent") === c.value
+                                    ? "border-white ring-2 ring-brand"
+                                    : "border-border/40 hover:border-white/60"
+                                }`}
+                                style={{ backgroundColor: c.value === "transparent" ? "transparent" : c.value }}
                               >
-                                ↗
-                              </a>
-                            )}
+                                {c.value === "transparent" && <span className="text-[9px] text-muted leading-none">✕</span>}
+                              </button>
+                            ))}
                           </div>
-                        ) : (
-                          <span className="text-muted">—</span>
                         )}
                       </td>
-                      <td className="py-3 px-2 text-right">
-                        {o.shippingAdvance ? fmtPKR(o.shippingAdvance) : <span className="text-muted">—</span>}
+                      {/* 1. Date */}
+                      <td className="py-2.5 px-2 text-muted whitespace-nowrap font-medium">
+                        {fmtDate(o.shopifyCreatedAt)}
                       </td>
-                      <td className="py-3 px-2">
-                        <Pill status={o.stage || o.financialStatus || "pending"} />
+
+                      {/* 2. Order No # */}
+                      <td className="py-2.5 px-2 font-bold text-text whitespace-nowrap">
+                        {o.orderNumber || "—"}
+                        {o.source === "manual" && <span className="ml-1 text-[10px] text-brand-light" title="Manual order">✍</span>}
                       </td>
-                      <td className="py-3 px-2 text-right font-semibold">{fmtPKR(o.totalPrice)}</td>
-                      <td className={`py-3 px-2 text-right font-semibold ${profit >= 0 ? "text-good" : "text-bad"}`}>
-                        {fmtPKR(profit)}
+
+                      {/* 3. Name */}
+                      <td className="py-2.5 px-2 font-medium text-text">
+                        {o.customerName || "—"}
+                        {o.customerCity && <div className="text-[10px] text-muted">{o.customerCity}</div>}
                       </td>
-                      <td className="py-3 px-2 text-right text-muted">{fmtDate(o.shopifyCreatedAt)}</td>
-                      <td className="py-3 px-2 text-right whitespace-nowrap">
+
+                      {/* 4. Item Name */}
+                      <td className="py-2.5 px-2 text-text/90 max-w-[200px] truncate" title={displayItem}>
+                        {displayItem}
+                      </td>
+
+                      {/* 5. Quantity */}
+                      <td className="py-2.5 px-2 text-center font-semibold text-text">
+                        {qty}
+                      </td>
+
+                      {/* 6. Price */}
+                      <td className="py-2.5 px-2 text-right font-bold text-good whitespace-nowrap">
+                        {fmtPKR(o.totalPrice)}
+                      </td>
+
+                      {/* 7. Confirmation */}
+                      <td className="py-2.5 px-2 text-center">
+                        <button
+                          onClick={() =>
+                            updateField(o.id, {
+                              confirmationStatus: isConfirmed ? "pending" : "confirmed",
+                            })
+                          }
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold transition ${
+                            isConfirmed
+                              ? "bg-good/20 text-good border border-good/30"
+                              : "bg-warn/20 text-warn border border-warn/30 hover:bg-warn/30"
+                          }`}
+                        >
+                          {isConfirmed ? "✓ Confirmed" : "⏳ Pending"}
+                        </button>
+                      </td>
+
+                      {/* 8. Payment (Type Only: COD / Online Payment) */}
+                      <td className="py-2.5 px-2">
+                        <select
+                          value={payMethod === "Online Payment" ? "Online Payment" : "COD"}
+                          onChange={(e) => updateField(o.id, { paymentMethod: e.target.value })}
+                          className="bg-panel2 text-xs font-semibold text-text border border-border rounded px-1.5 py-0.5 focus:outline-none focus:border-brand cursor-pointer"
+                        >
+                          <option value="COD">COD</option>
+                          <option value="Online Payment">Online Payment</option>
+                        </select>
+                      </td>
+
+                      {/* 9. Slip Print (Checkbox Only) */}
+                      <td className="py-2.5 px-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!o.slipPrinted}
+                          onChange={(e) => updateField(o.id, { slipPrinted: e.target.checked })}
+                          className="h-4 w-4 rounded border-border bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
+                          title="Checkmark if slip is printed"
+                        />
+                      </td>
+
+                      {/* 10. Packed */}
+                      <td className="py-2.5 px-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!o.isPacked}
+                          onChange={(e) => updateField(o.id, { isPacked: e.target.checked })}
+                          className="h-4 w-4 rounded border-border bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
+                        />
+                      </td>
+
+                      {/* 11. Courier Hand */}
+                      <td className="py-2.5 px-2 text-center">
+                        <button
+                          onClick={() => updateField(o.id, { isCourierHanded: !o.isCourierHanded })}
+                          className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${
+                            o.isCourierHanded
+                              ? "bg-accent/20 text-accent border border-accent/40"
+                              : "bg-panel2 text-muted border border-border hover:text-text"
+                          }`}
+                        >
+                          {o.isCourierHanded ? "🚚 Dispatched" : "Handover"}
+                        </button>
+                      </td>
+
+                      {/* 12. Contact No (Auto-fetched from Shopify, formatted 03xx + Inline Editable) */}
+                      <td className="py-2.5 px-2">
+                        <input
+                          type="text"
+                          defaultValue={formatPhone(o.customerPhone)}
+                          placeholder="03xx-xxxxxxx"
+                          onBlur={(e) => {
+                            const formatted = formatPhone(e.target.value);
+                            e.target.value = formatted;
+                            if (formatted !== formatPhone(o.customerPhone)) {
+                              updateField(o.id, { customerPhone: formatted });
+                            }
+                          }}
+                          className="bg-transparent hover:bg-panel2/60 focus:bg-panel2 text-xs text-text border border-transparent hover:border-border/60 focus:border-brand rounded px-1.5 py-1 w-full focus:outline-none transition"
+                        />
+                      </td>
+
+                      {/* 13. Remarks (Inline Manual Edit) */}
+                      <td className="py-2.5 px-2">
+                        <input
+                          type="text"
+                          defaultValue={o.remarks || ""}
+                          placeholder="Add remarks..."
+                          onBlur={(e) => {
+                            if (e.target.value !== (o.remarks || "")) {
+                              updateField(o.id, { remarks: e.target.value });
+                            }
+                          }}
+                          className="bg-transparent hover:bg-panel2/60 focus:bg-panel2 text-xs text-text border border-transparent hover:border-border/60 focus:border-brand rounded px-1.5 py-1 w-full focus:outline-none transition"
+                        />
+                      </td>
+
+                      {/* 14. Status */}
+                      <td className="py-2.5 px-2">
+                        <select
+                          value={o.deliveryStatus || "pending under ATC"}
+                          onChange={(e) => updateField(o.id, { deliveryStatus: e.target.value })}
+                          className="bg-panel2 text-xs text-text border border-border rounded px-1.5 py-1 focus:outline-none focus:border-brand cursor-pointer"
+                        >
+                          {DELIVERY_STATUSES.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+
+                      {/* 15 & 16. Actions */}
+                      <td className="py-2.5 px-2 text-right whitespace-nowrap">
                         <button className="text-brand-light hover:underline text-xs" onClick={() => setEdit(o)}>
                           Edit
                         </button>
                         {tab === "active" ? (
                           <button
-                            className="text-muted hover:text-text hover:underline text-xs ml-3"
+                            className="text-muted hover:text-text hover:underline text-xs ml-2"
                             onClick={() => setArchived(o.id, true)}
                             title="Archive kar do"
                           >
@@ -365,7 +659,7 @@ export default function OrdersPage() {
                         ) : (
                           o.archived && (
                             <button
-                              className="text-brand-light hover:underline text-xs ml-3"
+                              className="text-brand-light hover:underline text-xs ml-2"
                               onClick={() => setArchived(o.id, false)}
                             >
                               Restore
@@ -373,7 +667,7 @@ export default function OrdersPage() {
                           )
                         )}
                         {o.source === "manual" && (
-                          <button className="text-bad hover:underline text-xs ml-3" onClick={() => delOrder(o.id)}>
+                          <button className="text-bad hover:underline text-xs ml-2" onClick={() => delOrder(o.id)}>
                             Delete
                           </button>
                         )}
@@ -389,18 +683,57 @@ export default function OrdersPage() {
 
       {/* Edit modal */}
       {edit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setEdit(null)}>
-          <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold mb-1">{edit.orderNumber} — {edit.customerName}</h3>
-            <p className="text-xs text-muted mb-4">Stage, courier, shipping, prices aur tracking update karo.</p>
-            <div className="grid grid-cols-2 gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setEdit(null)}>
+          <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-lg mb-1">{edit.orderNumber} — {edit.customerName}</h3>
+            <p className="text-xs text-muted mb-4">Order details, status, contact aur notes update karo.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="label">Stage</label>
-                <select className="input" value={edit.stage || "processing"} onChange={(e) => setEdit({ ...edit, stage: e.target.value })}>
-                  {STAGES.map((s) => (
-                    <option key={s} value={s}>{STAGE_LABEL[s]}</option>
+                <label className="label">Customer Name</label>
+                <input className="input" value={edit.customerName || ""} onChange={(e) => setEdit({ ...edit, customerName: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Contact No</label>
+                <input className="input" value={edit.customerPhone || ""} onChange={(e) => setEdit({ ...edit, customerPhone: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">City</label>
+                <input className="input" value={edit.customerCity || ""} onChange={(e) => setEdit({ ...edit, customerCity: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Item Name</label>
+                <input className="input" value={edit.itemName || ""} onChange={(e) => setEdit({ ...edit, itemName: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Confirmation</label>
+                <select className="input" value={edit.confirmationStatus || "pending"} onChange={(e) => setEdit({ ...edit, confirmationStatus: e.target.value })}>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Delivery Status</label>
+                <select className="input" value={edit.deliveryStatus || "pending under ATC"} onChange={(e) => setEdit({ ...edit, deliveryStatus: e.target.value })}>
+                  {DELIVERY_STATUSES.map((st) => (
+                    <option key={st} value={st}>{st}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="label">Payment Method</label>
+                <select className="input" value={edit.paymentMethod || "COD"} onChange={(e) => setEdit({ ...edit, paymentMethod: e.target.value })}>
+                  <option value="COD">COD</option>
+                  <option value="Online Payment">Online Payment</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Sell Price (PKR)</label>
+                <input className="input" type="number" value={edit.totalPrice} onChange={(e) => setEdit({ ...edit, totalPrice: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <label className="label">Cost / COGS (PKR)</label>
+                <input className="input" type="number" value={edit.cogs} onChange={(e) => setEdit({ ...edit, cogs: parseFloat(e.target.value) || 0 })} />
               </div>
               <div>
                 <label className="label">Courier</label>
@@ -411,31 +744,118 @@ export default function OrdersPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Sell Price</label>
-                <input className="input" type="number" value={edit.totalPrice} onChange={(e) => setEdit({ ...edit, totalPrice: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div>
-                <label className="label">Cost / COGS</label>
-                <input className="input" type="number" value={edit.cogs} onChange={(e) => setEdit({ ...edit, cogs: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div className="col-span-2">
-                <label className="label">Shipping Advance (hand-paid, PKR)</label>
+                <label className="label">Shipping Advance (PKR)</label>
                 <input className="input" type="number" value={edit.shippingAdvance} onChange={(e) => setEdit({ ...edit, shippingAdvance: parseFloat(e.target.value) || 0 })} />
               </div>
-              <div>
-                <label className="label">Tracking ID (optional)</label>
-                <input className="input" placeholder="e.g. 784512..." value={edit.trackingId || ""} onChange={(e) => setEdit({ ...edit, trackingId: e.target.value })} />
+              <div className="flex items-center gap-4 py-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={!!edit.slipPrinted} onChange={(e) => setEdit({ ...edit, slipPrinted: e.target.checked })} />
+                  <span>Slip Printed</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={!!edit.isPacked} onChange={(e) => setEdit({ ...edit, isPacked: e.target.checked })} />
+                  <span>Order Packed</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={!!edit.isCourierHanded} onChange={(e) => setEdit({ ...edit, isCourierHanded: e.target.checked })} />
+                  <span>Delivered to Courier</span>
+                </label>
               </div>
-              <div>
-                <label className="label">Tracking Link (optional)</label>
-                <input className="input" placeholder="https://…" value={edit.trackingUrl || ""} onChange={(e) => setEdit({ ...edit, trackingUrl: e.target.value })} />
+              <div className="md:col-span-2">
+                <label className="label">Remarks</label>
+                <input className="input" value={edit.remarks || ""} onChange={(e) => setEdit({ ...edit, remarks: e.target.value })} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Special Details</label>
+                <input className="input" value={edit.specialDetails || ""} onChange={(e) => setEdit({ ...edit, specialDetails: e.target.value })} />
               </div>
             </div>
-            <div className="flex gap-2 pt-4">
+
+            <div className="flex gap-2 pt-5">
               <button className="btn-primary flex-1" onClick={saveEdit} disabled={saving}>
-                {saving ? "Saving…" : "Save"}
+                {saving ? "Saving…" : "Save Changes"}
               </button>
               <button className="btn-ghost" onClick={() => setEdit(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Slip Print Preview Modal */}
+      {printOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPrintOrder(null)}>
+          <div className="bg-white text-black p-8 rounded-2xl w-full max-w-md shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-start border-b pb-4 mb-4">
+              <div>
+                <h2 className="text-xl font-bold uppercase tracking-wider text-gray-900">Order Dispatch Slip</h2>
+                <div className="text-xs text-gray-500 font-mono mt-0.5">Order #{printOrder.orderNumber}</div>
+              </div>
+              <button className="text-gray-400 hover:text-black font-bold text-lg" onClick={() => setPrintOrder(null)}>✕</button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Date:</span>
+                <span className="font-semibold">{fmtDate(printOrder.shopifyCreatedAt)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Customer Name:</span>
+                <span className="font-semibold text-gray-900">{printOrder.customerName || "—"}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Contact Number:</span>
+                <span className="font-semibold text-gray-900">{printOrder.customerPhone || "—"}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">City / Destination:</span>
+                <span className="font-semibold text-gray-900">{printOrder.customerCity || "—"}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Item Name:</span>
+                <span className="font-semibold text-gray-900">
+                  {printOrder.itemName || (printOrder.lineItems?.map((l) => l.title).join(", ") || "—")}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Quantity:</span>
+                <span className="font-semibold">{printOrder.itemCount || 1}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Total Price:</span>
+                <span className="font-bold text-lg text-emerald-700">{fmtPKR(printOrder.totalPrice)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Payment Method:</span>
+                <span className="font-semibold uppercase">{printOrder.paymentMethod || "COD"} ({printOrder.financialStatus || "pending"})</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">Courier:</span>
+                <span className="font-semibold">{printOrder.courier || "Standard"}</span>
+              </div>
+              {printOrder.remarks && (
+                <div className="py-2 bg-gray-50 p-2.5 rounded border border-gray-200">
+                  <div className="text-xs font-semibold text-gray-500 uppercase">Remarks:</div>
+                  <div className="text-xs text-gray-800">{printOrder.remarks}</div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl shadow transition text-center"
+                onClick={() => {
+                  updateField(printOrder.id, { slipPrinted: true });
+                  window.print();
+                }}
+              >
+                🖨️ Print Slip Now
+              </button>
+              <button
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-4 rounded-xl transition"
+                onClick={() => setPrintOrder(null)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

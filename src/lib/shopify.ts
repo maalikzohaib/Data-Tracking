@@ -17,8 +17,10 @@ type ShopifyOrder = {
   cancelled_at: string | null;
   gateway?: string | null;
   payment_gateway_names?: string[];
-  customer?: { first_name?: string; last_name?: string } | null;
-  shipping_address?: { city?: string } | null;
+  phone?: string | null;
+  customer?: { first_name?: string; last_name?: string; phone?: string | null } | null;
+  shipping_address?: { city?: string; phone?: string | null } | null;
+  billing_address?: { phone?: string | null } | null;
   line_items: {
     id: number;
     title: string;
