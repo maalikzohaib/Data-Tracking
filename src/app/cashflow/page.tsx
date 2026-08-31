@@ -10,6 +10,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import { ArrowDownLeft, ArrowUpRight, Wallet, Landmark } from "lucide-react";
 import { PageHeader, Card, EmptyState, StatCard } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
 import { fmtPKR, fmtCompact, fmtDate } from "@/lib/format";
@@ -37,6 +38,15 @@ type Loan = {
 };
 
 type LoanSummary = { totalBorrowed: number; totalRepaid: number; outstanding: number };
+
+const tooltipStyle = {
+  background: "var(--panel)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  color: "var(--text)",
+  fontSize: 12,
+  fontFamily: "Inter, sans-serif",
+};
 
 export default function CashflowPage() {
   const [flows, setFlows] = useState<Flow[]>([]);
@@ -122,7 +132,7 @@ export default function CashflowPage() {
       <PageHeader title="Cash Flow" subtitle="Aap ke paas asal mein kitna cash hai — har paisa jo aaya ya gaya" />
 
       {/* Explanation banner */}
-      <div className="card p-4 mb-6 text-sm text-muted leading-relaxed">
+      <div className="card p-5 mb-6 text-sm text-muted leading-relaxed">
         <span className="text-text font-medium">Cash Flow kya hai?</span> Ye aap ka asal paisa track karta hai —
         jo bhi <span className="text-good">andar aaya</span> (sales, loan) aur jo{" "}
         <span className="text-bad">bahar gaya</span> (ads, inventory, shipping, expense). Net balance = aap ke haath/account
@@ -131,33 +141,33 @@ export default function CashflowPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Cash In" value={fmtPKR(cashIn)} icon="⬇️" tone="good" />
-        <StatCard label="Cash Out" value={fmtPKR(cashOut)} icon="⬆️" tone="bad" />
-        <StatCard label="Net Balance" value={fmtPKR(balance)} icon="💵" tone={balance >= 0 ? "brand" : "warn"} />
+        <StatCard label="Cash In" value={fmtPKR(cashIn)} icon={<ArrowDownLeft className="w-5 h-5 stroke-[2]" />} tone="good" />
+        <StatCard label="Cash Out" value={fmtPKR(cashOut)} icon={<ArrowUpRight className="w-5 h-5 stroke-[2]" />} tone="bad" />
+        <StatCard label="Net Balance" value={fmtPKR(balance)} icon={<Wallet className="w-5 h-5 stroke-[1.75]" />} tone={balance >= 0 ? "brand" : "warn"} />
         <StatCard
           label="Loan Outstanding"
           value={fmtPKR(lsum?.outstanding ?? 0)}
           sub={`Borrowed ${fmtCompact(lsum?.totalBorrowed ?? 0)}`}
-          icon="🏦"
+          icon={<Landmark className="w-5 h-5 stroke-[1.75]" />}
           tone={(lsum?.outstanding ?? 0) > 0 ? "warn" : "good"}
         />
       </div>
 
-      <Card title="Balance Over Time" className="mb-4">
+      <Card title="Balance Over Time" className="mb-5">
         {chart.length ? (
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={chart}>
               <defs>
                 <linearGradient id="bal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#f5c451" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#f5c451" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--text)" stopOpacity={0.12} />
+                  <stop offset="100%" stopColor="var(--text)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#232e31" />
-              <XAxis dataKey="date" stroke="#8b95ad" fontSize={11} />
-              <YAxis stroke="#8b95ad" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="date" stroke="var(--muted)" fontSize={11} />
+              <YAxis stroke="var(--muted)" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtPKR(v)} />
-              <Area type="monotone" dataKey="balance" stroke="#f5c451" fill="url(#bal)" strokeWidth={2} />
+              <Area type="monotone" dataKey="balance" stroke="var(--text)" fill="url(#bal)" strokeWidth={1.5} />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
@@ -166,9 +176,9 @@ export default function CashflowPage() {
       </Card>
 
       {/* Manual cash entry + ledger */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
         <Card title="Manual Cash Entry" className="h-fit">
-          <p className="text-xs text-muted mb-3">
+          <p className="text-micro text-muted mb-4">
             Opening balance ya koi cash jo kahin aur se track nahi hua.
           </p>
           <div className="space-y-3">
@@ -199,14 +209,14 @@ export default function CashflowPage() {
 
         <Card title="Ledger" className="lg:col-span-2">
           {loading ? (
-            <div className="text-muted text-sm py-10 text-center">Loading…</div>
+            <div className="text-muted text-caption py-10 text-center">Loading…</div>
           ) : flows.length === 0 ? (
             <EmptyState text="Ledger khali hai." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted border-b border-border">
+                  <tr className="text-left text-eyebrow text-muted uppercase border-b border-border">
                     <th className="py-3 px-2">Source</th>
                     <th className="py-3 px-2">Note</th>
                     <th className="py-3 px-2 text-right">In</th>
@@ -220,14 +230,14 @@ export default function CashflowPage() {
                   {flows.map((f) => {
                     const isManual = !f.refId && !AUTO_SOURCES.includes(f.source);
                     return (
-                      <tr key={f.id} className="border-b border-border/50 hover:bg-panel2/50">
+                      <tr key={f.id} className="border-b border-border hover:bg-panel2/50">
                         <td className="py-3 px-2">
-                          <span className="pill bg-panel2 text-muted">{f.source}</span>
+                          <span className="pill bg-shade-30 text-text">{f.source}</span>
                         </td>
                         <td className="py-3 px-2 text-muted">{f.note || "—"}</td>
                         <td className="py-3 px-2 text-right text-good">{f.type === "in" ? fmtPKR(f.amount) : "—"}</td>
                         <td className="py-3 px-2 text-right text-bad">{f.type === "out" ? fmtPKR(f.amount) : "—"}</td>
-                        <td className="py-3 px-2 text-right font-semibold">{fmtPKR(f.balance)}</td>
+                        <td className="py-3 px-2 text-right font-medium">{fmtPKR(f.balance)}</td>
                         <td className="py-3 px-2 text-right text-muted">{fmtDate(f.happenedAt)}</td>
                         <td className="py-3 px-2 text-right">
                           {isManual ? (
@@ -235,7 +245,7 @@ export default function CashflowPage() {
                               Delete
                             </button>
                           ) : (
-                            <span className="text-[10px] text-muted/60" title="Auto-linked — apne page se edit karo">
+                            <span className="text-micro text-muted" title="Auto-linked — apne page se edit karo">
                               auto
                             </span>
                           )}
@@ -253,7 +263,7 @@ export default function CashflowPage() {
       {/* Loan / Borrow */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card title="Naya Loan / Udhaar" className="h-fit">
-          <p className="text-xs text-muted mb-3">
+          <p className="text-micro text-muted mb-4">
             Bank ya kisi se udhaar liya paisa. Ye cash-in ho jayega par profit mein count nahi hoga.
           </p>
           <div className="space-y-3">
@@ -298,7 +308,7 @@ export default function CashflowPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted border-b border-border">
+                  <tr className="text-left text-eyebrow text-muted uppercase border-b border-border">
                     <th className="py-3 px-2">Lender</th>
                     <th className="py-3 px-2 text-right">Borrowed</th>
                     <th className="py-3 px-2 text-right">Repaid</th>
@@ -311,18 +321,18 @@ export default function CashflowPage() {
                   {loans.map((l) => {
                     const out = Math.max(l.principal - l.repaid, 0);
                     return (
-                      <tr key={l.id} className="border-b border-border/50 hover:bg-panel2/50">
+                      <tr key={l.id} className="border-b border-border hover:bg-panel2/50">
                         <td className="py-3 px-2">
                           <div className="font-medium">{l.lender}</div>
-                          {l.note && <div className="text-xs text-muted">{l.note}</div>}
+                          {l.note && <div className="text-micro text-muted">{l.note}</div>}
                         </td>
                         <td className="py-3 px-2 text-right">{fmtPKR(l.principal)}</td>
                         <td className="py-3 px-2 text-right text-good">{fmtPKR(l.repaid)}</td>
-                        <td className="py-3 px-2 text-right font-semibold text-warn">{fmtPKR(out)}</td>
+                        <td className="py-3 px-2 text-right font-medium text-warn">{fmtPKR(out)}</td>
                         <td className="py-3 px-2 text-right text-muted">{fmtDate(l.borrowedAt)}</td>
                         <td className="py-3 px-2 text-right whitespace-nowrap">
                           <button
-                            className="text-brand-light hover:underline text-xs mr-3"
+                            className="text-text hover:underline text-xs mr-3"
                             onClick={() =>
                               setRepay({ id: l.id, lender: l.lender, repaid: String(l.repaid || ""), principal: l.principal })
                             }
@@ -345,10 +355,10 @@ export default function CashflowPage() {
 
       {/* Repay modal */}
       {repay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setRepay(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setRepay(null)}>
           <div className="card p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold mb-1">Repayment — {repay.lender}</h3>
-            <p className="text-xs text-muted mb-4">
+            <h3 className="text-heading-md mb-1">Repayment — {repay.lender}</h3>
+            <p className="text-micro text-muted mb-5">
               Ab tak total kitna wapas kiya (principal {fmtPKR(repay.principal)}).
             </p>
             <div className="space-y-3">
@@ -376,11 +386,3 @@ export default function CashflowPage() {
     </>
   );
 }
-
-const tooltipStyle = {
-  background: "#12181a",
-  border: "1px solid #232e31",
-  borderRadius: 12,
-  color: "#e8efec",
-  fontSize: 12,
-};

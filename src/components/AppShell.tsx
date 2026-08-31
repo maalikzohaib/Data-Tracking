@@ -12,7 +12,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <TopBar onToggleMenu={() => setMenuOpen((v) => !v)} />
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="flex-1 w-full min-w-0">
-        <div className="w-full px-2 py-4 sm:px-3">
+        <div className="w-full px-3 py-4 sm:px-4 lg:px-5">
           {children}
         </div>
       </main>

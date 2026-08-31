@@ -16,6 +16,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { DollarSign, Wallet, Megaphone, Calculator } from "lucide-react";
 import { PageHeader, StatCard, Card, RangeTabs, EmptyState } from "@/components/ui";
 import { fmtPKR, fmtCompact, fmtNum } from "@/lib/format";
 
@@ -43,7 +44,16 @@ type StatsResponse = {
   breakdown: { name: string; value: number }[];
 };
 
-const PIE_COLORS = ["#10b981", "#f5c451", "#f87171", "#fbbf24", "#34d399", "#5eead4", "#fb923c"];
+const PIE_COLORS = ["#000000", "#3f3f46", "#71717a", "#a1a1aa", "#c1fbd4", "#d4f9e0", "#d4d4d8"];
+
+const tooltipStyle = {
+  background: "var(--panel)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  color: "var(--text)",
+  fontSize: 12,
+  fontFamily: "Inter, sans-serif",
+};
 
 export default function DashboardPage() {
   const [range, setRange] = useState("30d");
@@ -77,11 +87,11 @@ export default function DashboardPage() {
   const profitPositive = netProfit >= 0;
 
   const costParts = [
-    { label: "COGS", value: o?.cogs ?? 0, color: "#f5c451" },
-    { label: "Ad Spend", value: o?.adSpend ?? 0, color: "#5eead4" },
-    { label: "COD", value: o?.codCharges ?? 0, color: "#fb923c" },
-    { label: "Shipping", value: o?.shipping ?? 0, color: "#f87171" },
-    { label: "Expenses", value: o?.otherExpenses ?? 0, color: "#a78bfa" },
+    { label: "COGS", value: o?.cogs ?? 0, color: "#3f3f46" },
+    { label: "Ad Spend", value: o?.adSpend ?? 0, color: "#71717a" },
+    { label: "COD", value: o?.codCharges ?? 0, color: "#a1a1aa" },
+    { label: "Shipping", value: o?.shipping ?? 0, color: "#d4d4d8" },
+    { label: "Expenses", value: o?.otherExpenses ?? 0, color: "#c1fbd4" },
   ].filter((p) => p.value > 0);
   const totalCosts = costParts.reduce((s, p) => s + p.value, 0);
 
@@ -94,61 +104,60 @@ export default function DashboardPage() {
       />
 
       {error && (
-        <div className="card p-4 mb-6 border-bad/40 bg-bad/10 text-sm">
+        <div className="card p-4 mb-6 border-bad/40 bg-bad/8 text-sm">
           <strong className="text-bad">Failed to load stats data.</strong>{" "}
           <span className="text-muted">{error}</span>
         </div>
       )}
 
       {loading && !data ? (
-        <div className="text-muted text-sm py-20 text-center">Loading…</div>
+        <div className="text-muted text-caption py-20 text-center">Loading…</div>
       ) : (
         <>
-          {/* Hero: Net Profit banner with formula breakdown */}
+          {/* Hero: Net Profit banner */}
           <div
-            className="card p-6 mb-4 relative overflow-hidden"
-            style={{
-              backgroundImage: profitPositive
-                ? "radial-gradient(120% 140% at 0% 0%, rgba(16,185,129,0.16), transparent 55%), radial-gradient(120% 140% at 100% 100%, rgba(245,196,81,0.10), transparent 50%)"
-                : "radial-gradient(120% 140% at 0% 0%, rgba(248,113,113,0.16), transparent 55%)",
-            }}
+            className={`card p-6 mb-5 ${
+              profitPositive ? "bg-pistachio" : "bg-bad/8"
+            }`}
+            style={{ borderColor: profitPositive ? "#c1fbd4" : undefined }}
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="text-xs uppercase tracking-wider text-muted font-semibold">Net Profit</div>
+                <div className="text-eyebrow uppercase tracking-wider text-shade-60 font-medium">Net Profit</div>
                 <div
-                  className={`text-4xl font-display font-bold mt-1 ${
-                    profitPositive ? "text-good" : "text-bad"
+                  className={`text-4xl font-semibold mt-1.5 ${
+                    profitPositive ? "text-black" : "text-bad"
                   }`}
+                  style={{ fontWeight: 330, letterSpacing: "0.5px" }}
                 >
                   {fmtPKR(netProfit)}
                 </div>
-                <div className="text-sm text-muted mt-1">
+                <div className="text-caption text-shade-60 mt-1.5">
                   Revenue {fmtPKR(revenue)} · Margin{" "}
-                  <span className={profitPositive ? "text-good font-semibold" : "text-bad font-semibold"}>
+                  <span className={`font-semibold ${profitPositive ? "text-black" : "text-bad"}`}>
                     {margin.toFixed(1)}%
                   </span>
                 </div>
               </div>
-              <div className="flex gap-6">
+              <div className="flex gap-8">
                 <div>
-                  <div className="text-xs text-muted font-medium">Gross Profit</div>
-                  <div className="text-xl font-semibold mt-0.5">{fmtCompact(o?.grossProfit ?? 0)}</div>
+                  <div className="text-micro text-shade-50 font-medium">Gross Profit</div>
+                  <div className="text-xl font-semibold mt-0.5 text-black">{fmtCompact(o?.grossProfit ?? 0)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted font-medium">Total Costs</div>
-                  <div className="text-xl font-semibold mt-0.5">{fmtCompact(totalCosts)}</div>
+                  <div className="text-micro text-shade-50 font-medium">Total Costs</div>
+                  <div className="text-xl font-semibold mt-0.5 text-black">{fmtCompact(totalCosts)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted font-medium">ROAS</div>
-                  <div className="text-xl font-semibold mt-0.5">{(o?.roas ?? 0).toFixed(2)}x</div>
+                  <div className="text-micro text-shade-50 font-medium">ROAS</div>
+                  <div className="text-xl font-semibold mt-0.5 text-black">{(o?.roas ?? 0).toFixed(2)}x</div>
                 </div>
               </div>
             </div>
 
             {totalCosts > 0 && (
               <div className="mt-5">
-                <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-panel2 border border-border/40">
+                <div className="flex h-2 w-full rounded-pill overflow-hidden bg-white/60">
                   {costParts.map((p) => (
                     <div
                       key={p.label}
@@ -157,11 +166,11 @@ export default function DashboardPage() {
                     />
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
                   {costParts.map((p) => (
-                    <div key={p.label} className="flex items-center gap-1.5 text-xs text-muted">
-                      <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
-                      {p.label} <span className="text-text font-medium">{fmtCompact(p.value)}</span>
+                    <div key={p.label} className="flex items-center gap-1.5 text-micro text-shade-60">
+                      <span className="h-2 w-2 rounded-pill" style={{ background: p.color }} />
+                      {p.label} <span className="text-black font-medium">{fmtCompact(p.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -169,68 +178,62 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
             <StatCard
               label="Total Revenue"
               value={fmtPKR(revenue)}
               sub={`${fmtNum(o?.orders ?? 0)} orders`}
-              icon="💰"
+              icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />}
               tone="brand"
             />
             <StatCard
               label="Cash Balance"
               value={fmtPKR(o?.cashBalance ?? 0)}
               sub={`In ${fmtCompact(o?.cashIn ?? 0)} · Out ${fmtCompact(o?.cashOut ?? 0)}`}
-              icon="💵"
+              icon={<Wallet className="w-5 h-5 stroke-[1.75]" />}
               tone={(o?.cashBalance ?? 0) >= 0 ? "good" : "warn"}
             />
             <StatCard
               label="Ad Spend (Meta)"
               value={fmtPKR(o?.adSpend ?? 0)}
               sub={`ROAS ${(o?.roas ?? 0).toFixed(2)}x`}
-              icon="📣"
+              icon={<Megaphone className="w-5 h-5 stroke-[1.75]" />}
               tone="accent"
             />
             <StatCard
               label="Avg Order Value"
               value={fmtPKR(o?.aov ?? 0)}
               sub={`COD ${fmtCompact(o?.codCharges ?? 0)}`}
-              icon="🧮"
+              icon={<Calculator className="w-5 h-5 stroke-[1.75]" />}
               tone="brand"
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
             <Card title="Revenue vs Profit (daily)" className="lg:col-span-2">
               {data?.series.length ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <AreaChart data={data.series}>
                     <defs>
                       <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#000000" stopOpacity={0.12} />
+                        <stop offset="100%" stopColor="#000000" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="prof" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#34d399" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#c1fbd4" stopOpacity={0.6} />
+                        <stop offset="100%" stopColor="#c1fbd4" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="date" stroke="var(--muted)" fontSize={11} tickFormatter={(d) => d.slice(5)} />
                     <YAxis stroke="var(--muted)" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
                     <Tooltip
-                      contentStyle={{
-                        background: "var(--panel)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 12,
-                        color: "var(--text)",
-                        fontSize: 12,
-                      }}
+                      contentStyle={tooltipStyle}
                       formatter={(v: number) => fmtPKR(v)}
                     />
                     <Legend />
-                    <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#rev)" strokeWidth={2} name="Revenue" />
-                    <Area type="monotone" dataKey="profit" stroke="#34d399" fill="url(#prof)" strokeWidth={2} name="Profit" />
+                    <Area type="monotone" dataKey="revenue" stroke="#000000" fill="url(#rev)" strokeWidth={1.5} name="Revenue" />
+                    <Area type="monotone" dataKey="profit" stroke="#16a34a" fill="url(#prof)" strokeWidth={1.5} name="Profit" />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
@@ -257,13 +260,7 @@ export default function DashboardPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{
-                        background: "var(--panel)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 12,
-                        color: "var(--text)",
-                        fontSize: 12,
-                      }}
+                      contentStyle={tooltipStyle}
                       formatter={(v: number) => fmtPKR(v)}
                     />
                   </PieChart>
@@ -282,17 +279,11 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" stroke="var(--muted)" fontSize={11} tickFormatter={(d) => d.slice(5)} />
                   <YAxis stroke="var(--muted)" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
                   <Tooltip
-                    contentStyle={{
-                      background: "var(--panel)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      color: "var(--text)",
-                      fontSize: 12,
-                    }}
+                    contentStyle={tooltipStyle}
                     formatter={(v: number) => fmtPKR(v)}
                     cursor={{ fill: "var(--border)" }}
                   />
-                  <Bar dataKey="adSpend" fill="#f5c451" radius={[6, 6, 0, 0]} name="Ad Spend" />
+                  <Bar dataKey="adSpend" fill="var(--text)" radius={[6, 6, 0, 0]} name="Ad Spend" opacity={0.7} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

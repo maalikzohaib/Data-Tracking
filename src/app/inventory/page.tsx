@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Package, DollarSign, AlertTriangle, Hash, Info } from "lucide-react";
 import { PageHeader, Card, EmptyState, StatCard } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
 import { fmtPKR, fmtNum } from "@/lib/format";
@@ -64,13 +65,13 @@ export default function InventoryPage() {
       <PageHeader title="Inventory" subtitle="Shopify se stock auto-synced · buy price manual" />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Products" value={fmtNum(products.length)} icon="📦" tone="brand" />
-        <StatCard label="Cash on Inventory" value={fmtPKR(invValue)} icon="💵" tone="good" />
-        <StatCard label="Low Stock" value={fmtNum(lowStock.length)} icon="⚠️" tone={lowStock.length ? "bad" : "good"} />
-        <StatCard label="Total Units" value={fmtNum(products.reduce((s, p) => s + p.stock, 0))} icon="🔢" tone="accent" />
+        <StatCard label="Products" value={fmtNum(products.length)} icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+        <StatCard label="Cash on Inventory" value={fmtPKR(invValue)} icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
+        <StatCard label="Low Stock" value={fmtNum(lowStock.length)} icon={<AlertTriangle className="w-5 h-5 stroke-[1.75]" />} tone={lowStock.length ? "bad" : "good"} />
+        <StatCard label="Total Units" value={fmtNum(products.reduce((s, p) => s + p.stock, 0))} icon={<Hash className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
       </div>
 
-      <Card title="Inventory Buy (stock + cash auto-update)" className="mb-4">
+      <Card title="Inventory Buy (stock + cash auto-update)" className="mb-5">
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
           <div className="sm:col-span-2">
             <label className="label">Product</label>
@@ -103,14 +104,14 @@ export default function InventoryPage() {
 
       <Card title="Products">
         {loading ? (
-          <div className="text-muted text-sm py-10 text-center">Loading…</div>
+          <div className="text-muted text-caption py-10 text-center">Loading…</div>
         ) : products.length === 0 ? (
           <EmptyState text="Koi product nahi. Settings se Shopify sync chalao." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-muted border-b border-border">
+                <tr className="text-left text-eyebrow text-muted uppercase border-b border-border">
                   <th className="py-3 px-2">Product</th>
                   <th className="py-3 px-2">SKU</th>
                   <th className="py-3 px-2 text-right">Buy Price</th>
@@ -124,7 +125,7 @@ export default function InventoryPage() {
                   const margin = p.sellPrice - p.buyPrice;
                   const low = p.stock <= p.lowStockAlert;
                   return (
-                    <tr key={p.id} className="border-b border-border/50 hover:bg-panel2/50">
+                    <tr key={p.id} className="border-b border-border hover:bg-panel2/50">
                       <td className="py-3 px-2">{p.title}</td>
                       <td className="py-3 px-2 text-muted">{p.sku || "—"}</td>
                       <td className="py-3 px-2 text-right">
@@ -140,7 +141,7 @@ export default function InventoryPage() {
                         {fmtPKR(margin)}
                       </td>
                       <td className="py-3 px-2 text-right">
-                        <span className={`pill ${low ? "bg-bad/15 text-bad" : "bg-good/15 text-good"}`}>
+                        <span className={`pill ${low ? "bg-bad/15 text-bad" : "bg-aloe text-black"}`}>
                           {p.stock}
                         </span>
                       </td>
@@ -149,9 +150,10 @@ export default function InventoryPage() {
                 })}
               </tbody>
             </table>
-            <p className="text-xs text-muted mt-3">
-              💡 Buy price edit karke tab bahar click karo — COGS us par calculate hoti hai.
-            </p>
+            <div className="flex items-center gap-1.5 text-micro text-muted mt-4">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              <span>Buy price edit karke tab bahar click karo — COGS us par calculate hoti hai.</span>
+            </div>
           </div>
         )}
       </Card>

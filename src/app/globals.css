@@ -2,120 +2,201 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Shopify Design System: Transactional (Light) Track ── */
 :root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #fbfbf5;
+  --panel: #ffffff;
+  --panel2: #f8f8f2;
+  --border: #e4e4e7;
+  --muted: #71717a;
+  --muted2: #a1a1aa;
+  --text: #000000;
+  --brand: #000000;
+  --brand-light: #3f3f46;
+  --brand-dark: #000000;
+  --accent: #000000;
+  --good: #16a34a;
+  --bad: #dc2626;
+  --warn: #d97706;
+  --aloe: #c1fbd4;
+  --pistachio: #d4f9e0;
+  --shade-30: #d4d4d8;
+  --shade-40: #a1a1aa;
+  --shade-50: #71717a;
+  --shade-60: #52525b;
+  --shade-70: #3f3f46;
+  --card-shadow:
+    0 8px 8px rgba(0,0,0,0.04),
+    0 4px 4px rgba(0,0,0,0.04),
+    0 2px 2px rgba(0,0,0,0.04),
+    0 0 0 1px rgba(0,0,0,0.05);
+  --scroll-track: #fbfbf5;
+  --scroll-thumb: #d4d4d8;
+}
+
+/* ── Shopify Design System: Cinematic (Night) Track ── */
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0b0f10;
-  --panel: #12181a;
-  --panel2: #171f22;
-  --border: #232e31;
-  --muted: #8a9e9b;
-  --text: #e8efec;
-  --brand: #10b981;
-  --brand-light: #34d399;
-  --brand-dark: #059669;
-  --accent: #f5c451;
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --panel2: #111111;
+  --border: #1e2c31;
+  --muted: #a1a1aa;
+  --muted2: #71717a;
+  --text: #ffffff;
+  --brand: #ffffff;
+  --brand-light: #d4d4d8;
+  --brand-dark: #ffffff;
+  --accent: #ffffff;
   --good: #34d399;
   --bad: #f87171;
   --warn: #fbbf24;
-  --card-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 30px rgba(0,0,0,0.4);
-  --scroll-track: #0b0f10;
-  --scroll-thumb: #232e31;
+  --aloe: #c1fbd4;
+  --pistachio: #d4f9e0;
+  --shade-30: #3f3f46;
+  --shade-40: #52525b;
+  --shade-50: #71717a;
+  --shade-60: #a1a1aa;
+  --shade-70: #d4d4d8;
+  --card-shadow:
+    0 1px 2px rgba(255,255,255,0.03),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  --scroll-track: #000000;
+  --scroll-thumb: #1e2c31;
 }
 
-[data-theme="light"] {
-  color-scheme: light;
-  --bg: #f1f5f9;
-  --panel: #ffffff;
-  --panel2: #f8fafc;
-  --border: #cbd5e1;
-  --muted: #64748b;
-  --text: #0f172a;
-  --brand: #059669;
-  --brand-light: #10b981;
-  --brand-dark: #047857;
-  --accent: #d97706;
-  --good: #059669;
-  --bad: #dc2626;
-  --warn: #d97706;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.04);
-  --scroll-track: #f1f5f9;
-  --scroll-thumb: #cbd5e1;
-}
-
+/* ── Base Typography ── */
 html,
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Inter", "Inter Variable", Helvetica, Arial, sans-serif;
+  font-feature-settings: "ss03";
+  font-weight: 420;
+  font-size: 16px;
+  line-height: 1.5;
   background-color: var(--bg);
   color: var(--text);
   transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6, .font-display {
-  font-family: "Times New Roman", Times, serif;
+  font-family: "Inter", Helvetica, Arial, sans-serif;
+  font-feature-settings: "ss03";
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
-/* Subtle ambient background glow */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(60rem 40rem at 15% -10%, rgba(16, 185, 129, 0.07), transparent 60%),
-    radial-gradient(50rem 40rem at 100% 0%, rgba(245, 196, 81, 0.05), transparent 55%);
-  pointer-events: none;
-}
-
-/* Custom scrollbar */
+/* ── Custom Scrollbar ── */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: var(--scroll-track);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--scroll-thumb);
-  border-radius: 8px;
+  border-radius: 9999px;
   border: 2px solid var(--scroll-track);
 }
 ::-webkit-scrollbar-thumb:hover {
   filter: brightness(0.85);
 }
 
+/* ── Component Layer ── */
 @layer components {
+
+  /* Card — Shopify pricing card style */
   .card {
-    @apply bg-panel border border-border rounded-2xl shadow-card transition-colors;
+    @apply bg-panel border border-border transition-colors;
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
   }
+
+  /* Base button — pill shape, always */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-medium transition-all;
+    border-radius: 9999px;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.5;
   }
+
+  /* Primary button — solid black fill on light, solid white fill on dark */
   .btn-primary {
-    @apply btn text-white font-semibold;
-    background-image: linear-gradient(135deg, #10b981, #059669);
+    @apply btn text-white;
+    background-color: var(--brand);
+    color: var(--bg);
   }
   .btn-primary:hover {
+    background-color: var(--shade-70);
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
   }
+  .btn-primary:active {
+    background-color: var(--shade-60);
+    transform: translateY(0);
+  }
+
+  /* Ghost / outline button — pill with 1px border */
   .btn-ghost {
-    @apply btn bg-panel2 border border-border text-text hover:border-brand transition-colors;
+    @apply btn bg-transparent border text-text transition-colors;
+    border-color: var(--border);
   }
+  .btn-ghost:hover {
+    border-color: var(--text);
+  }
+
+  /* Aloe CTA — mint fill pill for featured actions */
+  .btn-aloe {
+    @apply btn;
+    background-color: var(--aloe);
+    color: #000000;
+  }
+  .btn-aloe:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+  }
+
+  /* Input — Shopify text-input component */
   .input {
-    @apply w-full rounded-xl bg-panel2 border border-border px-3 py-2 text-sm text-text outline-none transition-colors;
+    @apply w-full bg-panel border border-border px-3 py-2.5 text-sm text-text outline-none transition-colors;
+    border-radius: 8px;
+    font-weight: 420;
+    line-height: 1.5;
   }
   .input::placeholder {
-    @apply text-muted opacity-70;
+    color: var(--muted);
+    opacity: 0.7;
   }
   .input:focus {
-    @apply border-brand;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
+    border-color: var(--text);
+    box-shadow: 0 0 0 1px var(--text);
   }
+
+  /* Label */
   .label {
-    @apply block text-xs font-medium text-muted mb-1.5;
+    @apply block text-xs font-medium mb-1.5;
+    color: var(--muted);
+    letter-spacing: 0.28px;
   }
+
+  /* Pill tags — Shopify mint and shade variants */
   .pill {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center px-3 py-0.5 text-xs font-medium;
+    border-radius: 9999px;
+    letter-spacing: 0.28px;
+  }
+
+  .pill-mint {
+    background-color: var(--aloe);
+    color: #000000;
+  }
+
+  .pill-shade {
+    background-color: var(--shade-30);
+    color: var(--text);
   }
 }

@@ -12,6 +12,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { Megaphone, DollarSign, TrendingUp, Target, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { PageHeader, Card, EmptyState, StatCard } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
 import { fmtPKR, fmtCompact, fmtNum, fmtDate } from "@/lib/format";
@@ -47,6 +48,15 @@ type BudgetSummary = {
   spent: number;
   remaining: number;
   usedPct: number;
+};
+
+const tooltipStyle = {
+  background: "var(--panel)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  color: "var(--text)",
+  fontSize: 12,
+  fontFamily: "Inter, sans-serif",
 };
 
 export default function MetaPage() {
@@ -166,40 +176,41 @@ export default function MetaPage() {
         subtitle="Facebook / Instagram ads — Meta se live fetch hota hai"
         action={
           <div className="flex items-center gap-3">
-            {refreshMsg && <span className="text-xs text-muted">{refreshMsg}</span>}
-            <button className="btn-primary" onClick={refreshMeta} disabled={refreshing}>
-              {refreshing ? "Fetching…" : "🔄 Refresh from Meta"}
+            {refreshMsg && <span className="text-micro text-muted">{refreshMsg}</span>}
+            <button className="btn-primary flex items-center gap-2" onClick={refreshMeta} disabled={refreshing}>
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              <span>{refreshing ? "Fetching…" : "Refresh from Meta"}</span>
             </button>
           </div>
         }
       />
 
       {loading && (
-        <div className="card p-3 mb-4 text-sm text-muted">
+        <div className="card p-4 mb-5 text-caption text-muted">
           Meta se latest data laa rahe hain…
         </div>
       )}
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Spend" value={fmtPKR(totalSpend)} icon="📣" tone="accent" />
-        <StatCard label="Ad Revenue" value={fmtPKR(totalRev)} icon="💰" tone="brand" />
-        <StatCard label="ROAS" value={`${roas.toFixed(2)}x`} sub={`${fmtNum(totalPurch)} purchases`} icon="📈" tone={roas >= 1 ? "good" : "bad"} />
-        <StatCard label="Cost / Purchase" value={fmtPKR(cpp)} icon="🎯" tone="warn" />
+        <StatCard label="Total Spend" value={fmtPKR(totalSpend)} icon={<Megaphone className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
+        <StatCard label="Ad Revenue" value={fmtPKR(totalRev)} icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+        <StatCard label="ROAS" value={`${roas.toFixed(2)}x`} sub={`${fmtNum(totalPurch)} purchases`} icon={<TrendingUp className="w-5 h-5 stroke-[1.75]" />} tone={roas >= 1 ? "good" : "bad"} />
+        <StatCard label="Cost / Purchase" value={fmtPKR(cpp)} icon={<Target className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
       </div>
 
-      <Card title="Spend vs Revenue vs ROAS" className="mb-4">
+      <Card title="Spend vs Revenue vs ROAS" className="mb-5">
         {chartData.length ? (
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#232e31" />
-              <XAxis dataKey="label" stroke="#8b95ad" fontSize={11} />
-              <YAxis yAxisId="left" stroke="#8b95ad" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
-              <YAxis yAxisId="right" orientation="right" stroke="#8b95ad" fontSize={11} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" stroke="var(--muted)" fontSize={11} />
+              <YAxis yAxisId="left" stroke="var(--muted)" fontSize={11} tickFormatter={(v) => fmtCompact(v)} />
+              <YAxis yAxisId="right" orientation="right" stroke="var(--muted)" fontSize={11} />
               <Tooltip contentStyle={tooltipStyle} />
               <Legend />
-              <Bar yAxisId="left" dataKey="spend" fill="#f5c451" radius={[4, 4, 0, 0]} name="Spend" />
-              <Bar yAxisId="left" dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} name="Revenue" />
-              <Line yAxisId="right" type="monotone" dataKey="roas" stroke="#34d399" strokeWidth={2} name="ROAS (x)" dot={false} />
+              <Bar yAxisId="left" dataKey="spend" fill="var(--shade-40)" radius={[4, 4, 0, 0]} name="Spend" />
+              <Bar yAxisId="left" dataKey="revenue" fill="var(--aloe)" radius={[4, 4, 0, 0]} name="Revenue" />
+              <Line yAxisId="right" type="monotone" dataKey="roas" stroke="var(--text)" strokeWidth={1.5} name="ROAS (x)" dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         ) : (
@@ -210,15 +221,14 @@ export default function MetaPage() {
       <Card
         title="Reports"
         action={
-          <div className="inline-flex rounded-xl bg-panel2 border border-border p-1">
+          <div className="inline-flex rounded-pill bg-panel2 border border-border p-1">
             {(["daily", "weekly"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg capitalize transition ${
-                  tab === t ? "text-white" : "text-muted"
+                className={`px-3.5 py-1.5 text-xs font-medium rounded-pill capitalize transition-all ${
+                  tab === t ? "bg-text text-bg" : "text-muted hover:text-text"
                 }`}
-                style={tab === t ? { backgroundImage: "linear-gradient(135deg,#10b981,#059669)" } : undefined}
               >
                 {t}
               </button>
@@ -227,7 +237,7 @@ export default function MetaPage() {
         }
       >
         {loading ? (
-          <div className="text-muted text-sm py-10 text-center">Loading…</div>
+          <div className="text-muted text-caption py-10 text-center">Loading…</div>
         ) : tab === "daily" ? (
           daily.length === 0 ? (
             <EmptyState text="Koi daily record nahi." />
@@ -235,7 +245,7 @@ export default function MetaPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted border-b border-border">
+                  <tr className="text-left text-eyebrow text-muted uppercase border-b border-border">
                     <th className="py-3 px-2">Date</th>
                     <th className="py-3 px-2 text-right">Spend</th>
                     <th className="py-3 px-2 text-right">Revenue</th>
@@ -248,7 +258,7 @@ export default function MetaPage() {
                 </thead>
                 <tbody>
                   {daily.map((d) => (
-                    <tr key={d.id} className="border-b border-border/50 hover:bg-panel2/50">
+                    <tr key={d.id} className="border-b border-border hover:bg-panel2/50">
                       <td className="py-3 px-2">{fmtDate(d.date)}</td>
                       <td className="py-3 px-2 text-right">{fmtPKR(d.spend)}</td>
                       <td className="py-3 px-2 text-right">{fmtPKR(d.revenue)}</td>
@@ -275,7 +285,7 @@ export default function MetaPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-muted border-b border-border">
+                <tr className="text-left text-eyebrow text-muted uppercase border-b border-border">
                   <th className="py-3 px-2">Week</th>
                   <th className="py-3 px-2 text-right">Spend</th>
                   <th className="py-3 px-2 text-right">Revenue</th>
@@ -285,7 +295,7 @@ export default function MetaPage() {
               </thead>
               <tbody>
                 {weekly.map((w) => (
-                  <tr key={w.week} className="border-b border-border/50 hover:bg-panel2/50">
+                  <tr key={w.week} className="border-b border-border hover:bg-panel2/50">
                     <td className="py-3 px-2 font-medium">{w.week}</td>
                     <td className="py-3 px-2 text-right">{fmtPKR(w.spend)}</td>
                     <td className="py-3 px-2 text-right">{fmtPKR(w.revenue)}</td>
@@ -301,9 +311,9 @@ export default function MetaPage() {
         )}
       </Card>
 
-      {/* Manual Ad Spend Entry — Reports ke neeche */}
-      <Card title="Manual Ad Spend" className="mt-4">
-        <p className="text-xs text-muted mb-4">
+      {/* Manual Ad Spend Entry */}
+      <Card title="Manual Ad Spend" className="mt-5">
+        <p className="text-micro text-muted mb-4">
           Jab account se ads ke paise detect hon, yahan add karo. Ye cash-out ledger aur budget mein
           apne aap count ho jayega. (Auto-sync bhi isi ko update karta hai.)
         </p>
@@ -353,19 +363,19 @@ export default function MetaPage() {
         </div>
       </Card>
 
-      {/* Ad Budget vs Spent — Reports ke neeche */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+      {/* Ad Budget vs Spent */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-5">
         <Card title="Budget vs Spent (Meta actual)" className="lg:col-span-2">
           {bsum && bsum.totalBudget > 0 ? (
             <div className="mb-5">
               <div className="flex items-end justify-between mb-2">
                 <div>
-                  <div className="text-xs text-muted">Total Allocated</div>
-                  <div className="text-xl font-bold">{fmtPKR(bsum.totalBudget)}</div>
+                  <div className="text-micro text-muted">Total Allocated</div>
+                  <div className="text-xl font-semibold">{fmtPKR(bsum.totalBudget)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-muted">Spent / Remaining</div>
-                  <div className="text-sm font-semibold">
+                  <div className="text-micro text-muted">Spent / Remaining</div>
+                  <div className="text-sm font-medium">
                     {fmtPKR(bsum.spent)} <span className="text-muted">/</span>{" "}
                     <span className={bsum.remaining > 0 ? "text-good" : "text-bad"}>
                       {fmtPKR(bsum.remaining)}
@@ -373,19 +383,17 @@ export default function MetaPage() {
                   </div>
                 </div>
               </div>
-              <div className="h-3 w-full rounded-full bg-panel2 overflow-hidden">
+              <div className="h-2.5 w-full rounded-pill bg-panel2 overflow-hidden border border-border">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-pill transition-all"
                   style={{
                     width: `${bsum.usedPct}%`,
-                    backgroundImage:
-                      bsum.usedPct >= 90
-                        ? "linear-gradient(90deg,#f87171,#dc2626)"
-                        : "linear-gradient(90deg,#10b981,#f5c451)",
+                    backgroundColor:
+                      bsum.usedPct >= 90 ? "var(--bad)" : "var(--aloe)",
                   }}
                 />
               </div>
-              <div className="text-xs text-muted mt-1.5">{bsum.usedPct.toFixed(0)}% used</div>
+              <div className="text-micro text-muted mt-1.5">{bsum.usedPct.toFixed(0)}% used</div>
             </div>
           ) : (
             <EmptyState text="Koi budget set nahi. Right form se add karo." />
@@ -396,16 +404,16 @@ export default function MetaPage() {
               {budgets.map((b) => (
                 <div
                   key={b.id}
-                  className="flex items-center justify-between rounded-xl bg-panel2 border border-border px-3 py-2"
+                  className="flex items-center justify-between rounded-shopify-lg bg-panel2 border border-border px-4 py-3"
                 >
                   <div>
                     <div className="text-sm font-medium">{b.name}</div>
-                    <div className="text-xs text-muted capitalize">
+                    <div className="text-micro text-muted capitalize">
                       {b.platform} · {b.period}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold">{fmtPKR(b.amount)}</span>
+                    <span className="text-sm font-medium">{fmtPKR(b.amount)}</span>
                     <button
                       className="text-bad hover:underline text-xs"
                       onClick={() => delBudget(b.id)}
@@ -463,11 +471,3 @@ export default function MetaPage() {
     </>
   );
 }
-
-const tooltipStyle = {
-  background: "#111726",
-  border: "1px solid #232e31",
-  borderRadius: 12,
-  color: "#e6e9f0",
-  fontSize: 12,
-};

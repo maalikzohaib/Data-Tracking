@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader, Card, EmptyState, StatCard, Pill } from "@/components/ui";
+import { Truck, Clock, Package, RotateCcw } from "lucide-react";
+import { PageHeader, Card, EmptyState, StatCard } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
 import { fmtPKR, fmtDate } from "@/lib/format";
 
@@ -62,10 +63,10 @@ export default function CodPage() {
       <PageHeader title="COD Charges" subtitle="Courier-wise cash-on-delivery tracking" />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total COD Charges" value={fmtPKR(totalCharges)} icon="🚚" tone="accent" />
-        <StatCard label="Pending Collection" value={fmtPKR(pending)} icon="⏳" tone="warn" />
-        <StatCard label="Shipments" value={String(charges.length)} icon="📦" tone="brand" />
-        <StatCard label="Returns" value={String(returned)} icon="↩️" tone={returned ? "bad" : "good"} />
+        <StatCard label="Total COD Charges" value={fmtPKR(totalCharges)} icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
+        <StatCard label="Pending Collection" value={fmtPKR(pending)} icon={<Clock className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+        <StatCard label="Shipments" value={String(charges.length)} icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+        <StatCard label="Returns" value={String(returned)} icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />} tone={returned ? "bad" : "good"} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -107,14 +108,14 @@ export default function CodPage() {
 
         <Card title="COD Records" className="lg:col-span-2">
           {loading ? (
-            <div className="text-muted text-sm py-10 text-center">Loading…</div>
+            <div className="text-muted text-caption py-10 text-center">Loading…</div>
           ) : charges.length === 0 ? (
             <EmptyState text="Abhi koi COD record nahi." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted border-b border-border">
+                  <tr className="text-left text-eyebrow text-muted uppercase border-b border-border">
                     <th className="py-3 px-2">Courier</th>
                     <th className="py-3 px-2">Order</th>
                     <th className="py-3 px-2 text-right">Charge</th>
@@ -125,14 +126,14 @@ export default function CodPage() {
                 </thead>
                 <tbody>
                   {charges.map((c) => (
-                    <tr key={c.id} className="border-b border-border/50 hover:bg-panel2/50">
+                    <tr key={c.id} className="border-b border-border hover:bg-panel2/50">
                       <td className="py-3 px-2 font-medium">{c.courier}</td>
                       <td className="py-3 px-2 text-muted">{c.orderRef || "—"}</td>
                       <td className="py-3 px-2 text-right">{fmtPKR(c.amount)}</td>
                       <td className="py-3 px-2 text-right">{fmtPKR(c.codCollected)}</td>
                       <td className="py-3 px-2">
                         <select
-                          className="bg-transparent text-xs outline-none cursor-pointer"
+                          className="bg-panel2 text-xs text-text border border-border rounded-shopify-sm outline-none cursor-pointer px-1.5 py-0.5 focus:border-text"
                           value={c.status}
                           onChange={(e) => setStatus(c.id, e.target.value)}
                         >

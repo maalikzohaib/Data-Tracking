@@ -46,37 +46,34 @@ function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-md bg-panel border border-border rounded-3xl p-8 shadow-card relative overflow-hidden">
-      {/* Glow effect */}
-      <div
-        className="absolute -top-12 -right-12 w-40 h-40 rounded-full opacity-20 blur-3xl pointer-events-none"
-        style={{ backgroundImage: "linear-gradient(135deg, #10b981, #f5c451)" }}
-      />
-
-      <div className="flex flex-col items-center text-center mb-8">
-        <div
-          className="h-14 w-14 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-glow font-display mb-3"
-          style={{ backgroundImage: "linear-gradient(135deg, #10b981, #f5c451)" }}
-        >
+    <div
+      className="w-full max-w-md bg-panel border border-border p-10 relative"
+      style={{
+        borderRadius: "20px",
+        boxShadow: "0 8px 8px rgba(0,0,0,0.04), 0 4px 4px rgba(0,0,0,0.04), 0 2px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.05)",
+      }}
+    >
+      <div className="flex flex-col items-center text-center mb-10">
+        <div className="h-12 w-12 rounded-pill bg-text flex items-center justify-center text-bg font-semibold text-lg mb-4">
           B
         </div>
-        <h1 className="text-2xl font-display font-bold tracking-tight">Business Tracker</h1>
-        <p className="text-sm text-muted mt-1">Personal Store & Order Analytics</p>
+        <h1 className="text-heading-xl text-text tracking-tight">Business Tracker</h1>
+        <p className="text-caption text-muted mt-1.5">Personal Store & Order Analytics</p>
       </div>
 
       {error && (
-        <div className="mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-medium text-center">
-          ⚠️ {error}
+        <div className="mb-6 p-3.5 rounded-shopify-md bg-bad/8 border border-bad/20 text-bad text-xs font-medium text-center">
+          {error}
         </div>
       )}
 
-      <form onSubmit={handleLogin} className="space-y-4">
+      <form onSubmit={handleLogin} className="space-y-5">
         <div>
           <label className="label">Username</label>
           <input
             type="text"
             required
-            className="input text-sm"
+            className="input"
             placeholder="Enter username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -89,25 +86,25 @@ function LoginForm() {
           <input
             type="password"
             required
-            className="input text-sm"
+            className="input"
             placeholder="Enter password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
 
-        <div className="pt-2">
+        <div className="pt-3">
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full py-2.5 text-sm font-semibold tracking-wide"
+            className="btn-primary w-full py-3 text-sm font-medium tracking-wide disabled:opacity-50"
           >
-            {loading ? "Signing in..." : "Sign In to Business Tracker"}
+            {loading ? "Signing in..." : "Sign In"}
           </button>
         </div>
       </form>
 
-      <div className="mt-8 text-center text-xs text-muted">
+      <div className="mt-10 text-center text-micro text-muted">
         Session remains active for 8 hours.
       </div>
     </div>

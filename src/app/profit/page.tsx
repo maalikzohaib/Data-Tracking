@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DollarSign, BarChart3, TrendingUp, Target, Info } from "lucide-react";
 import { PageHeader, Card, RangeTabs, StatCard } from "@/components/ui";
 import { apiGet } from "@/lib/client";
 import { fmtPKR } from "@/lib/format";
@@ -53,27 +54,27 @@ export default function ProfitPage() {
       />
 
       {loading ? (
-        <div className="text-muted text-sm py-20 text-center">Loading…</div>
+        <div className="text-muted text-caption py-20 text-center">Loading…</div>
       ) : (
         <>
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            <StatCard label="Revenue" value={fmtPKR(o?.revenue ?? 0)} icon="💰" tone="brand" />
-            <StatCard label="Gross Profit" value={fmtPKR(o?.grossProfit ?? 0)} icon="📊" tone="accent" />
-            <StatCard label="Net Profit" value={fmtPKR(o?.netProfit ?? 0)} sub={`${margin.toFixed(1)}% margin`} icon="📈" tone={(o?.netProfit ?? 0) >= 0 ? "good" : "bad"} />
-            <StatCard label="ROAS" value={`${(o?.roas ?? 0).toFixed(2)}x`} icon="🎯" tone="warn" />
+            <StatCard label="Revenue" value={fmtPKR(o?.revenue ?? 0)} icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+            <StatCard label="Gross Profit" value={fmtPKR(o?.grossProfit ?? 0)} icon={<BarChart3 className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
+            <StatCard label="Net Profit" value={fmtPKR(o?.netProfit ?? 0)} sub={`${margin.toFixed(1)}% margin`} icon={<TrendingUp className="w-5 h-5 stroke-[1.75]" />} tone={(o?.netProfit ?? 0) >= 0 ? "good" : "bad"} />
+            <StatCard label="ROAS" value={`${(o?.roas ?? 0).toFixed(2)}x`} icon={<Target className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
           </div>
 
           <Card title="Profit & Loss Statement">
-            <div className="divide-y divide-border/60">
+            <div className="divide-y divide-border">
               {rows.map((r) => {
                 const isTotal = r.kind === "total";
                 const isSub = r.kind === "sub";
                 return (
                   <div
                     key={r.label}
-                    className={`flex items-center justify-between py-3 px-2 ${
-                      isTotal ? "text-lg font-bold" : isSub ? "font-semibold" : ""
-                    } ${isSub || isTotal ? "bg-panel2/40 rounded-lg my-1" : ""}`}
+                    className={`flex items-center justify-between py-3.5 px-3 ${
+                      isTotal ? "text-lg font-semibold" : isSub ? "font-medium" : ""
+                    } ${isSub || isTotal ? "bg-pistachio/40 rounded-shopify-md my-1" : ""}`}
                   >
                     <span className={r.kind === "out" ? "text-muted" : ""}>{r.label}</span>
                     <span
@@ -93,9 +94,10 @@ export default function ProfitPage() {
                 );
               })}
             </div>
-            <p className="text-xs text-muted mt-4">
-              💡 COGS aap ke inventory buy price par calculate hoti hai (SKU match). Buy price Inventory page se set karo.
-            </p>
+            <div className="flex items-center gap-1.5 text-micro text-muted mt-5">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              <span>COGS aap ke inventory buy price par calculate hoti hai (SKU match). Buy price Inventory page se set karo.</span>
+            </div>
           </Card>
         </>
       )}

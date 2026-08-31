@@ -1,6 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ReactNode } from "react";
+import {
+  Search,
+  RefreshCw,
+  CheckCircle2,
+  Clock,
+  Truck,
+  Package,
+  ShoppingCart,
+  DollarSign,
+  Wallet,
+  BarChart3,
+  AlertTriangle,
+  XCircle,
+  Printer,
+  Check,
+  Calendar,
+  X,
+  FileEdit,
+} from "lucide-react";
 import { PageHeader, Card, Pill, StatCard, EmptyState } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
 import { fmtPKR, fmtDate } from "@/lib/format";
@@ -52,16 +71,16 @@ const STAGES = ["processing", "shipped", "completed", "cancelled"] as const;
 // Color palette for order row labels (10 main colors + None)
 const COLOR_OPTIONS = [
   { label: "None",    value: "transparent" },
-  { label: "Green",   value: "#22c55e" },
-  { label: "Lime",    value: "#84cc16" },
-  { label: "Orange",  value: "#f97316" },
-  { label: "Yellow",  value: "#eab308" },
-  { label: "Red",     value: "#ef4444" },
-  { label: "Blue",    value: "#3b82f6" },
-  { label: "Purple",  value: "#a855f7" },
-  { label: "Pink",    value: "#ec4899" },
-  { label: "Cyan",    value: "#06b6d4" },
-  { label: "Gray",    value: "#6b7280" },
+  { label: "Green",   value: "#16a34a" },
+  { label: "Lime",    value: "#65a30d" },
+  { label: "Orange",  value: "#ea580c" },
+  { label: "Yellow",  value: "#ca8a04" },
+  { label: "Red",     value: "#dc2626" },
+  { label: "Blue",    value: "#2563eb" },
+  { label: "Purple",  value: "#9333ea" },
+  { label: "Pink",    value: "#db2777" },
+  { label: "Cyan",    value: "#0891b2" },
+  { label: "Gray",    value: "#52525b" },
 ];
 
 /** Normalize phone: +923xx → 03xx, 923xx → 03xx, already 03xx → as-is */
@@ -306,17 +325,17 @@ export default function OrdersPage() {
   const isActive = (o: Order) =>
     !isArchived(o) && !isDelivered(o) && !isCourierHanded(o);
 
-  const getOrderSection = (o: Order): { key: string; label: string; icon: string; badgeStyle: string } => {
+  const getOrderSection = (o: Order): { key: string; label: string; icon: ReactNode; badgeStyle: string } => {
     if (isArchived(o)) {
-      return { key: "archive", label: "Archive", icon: "📦", badgeStyle: "bg-gray-500/20 text-gray-300 border border-gray-500/30" };
+      return { key: "archive", label: "Archive", icon: <Package className="w-3.5 h-3.5" />, badgeStyle: "bg-shade-30 text-shade-60 border border-shade-30" };
     }
     if (isDelivered(o)) {
-      return { key: "delivered", label: "Delivered", icon: "✅", badgeStyle: "bg-blue-500/20 text-blue-400 border border-blue-500/30" };
+      return { key: "delivered", label: "Delivered", icon: <CheckCircle2 className="w-3.5 h-3.5" />, badgeStyle: "bg-aloe text-black border border-aloe" };
     }
     if (isCourierHanded(o)) {
-      return { key: "courierHanded", label: "Courier Handed", icon: "🚚", badgeStyle: "bg-amber-500/20 text-amber-400 border border-amber-500/30" };
+      return { key: "courierHanded", label: "Courier Handed", icon: <Truck className="w-3.5 h-3.5" />, badgeStyle: "bg-pistachio text-black border border-pistachio" };
     }
-    return { key: "active", label: "Active", icon: "🛒", badgeStyle: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" };
+    return { key: "active", label: "Active", icon: <ShoppingCart className="w-3.5 h-3.5" />, badgeStyle: "bg-text/10 text-text border border-text/20" };
   };
 
   const bySearch = (o: Order) =>
@@ -364,10 +383,10 @@ export default function OrdersPage() {
 
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Global Matches" value={String(totalCount)} sub={`Search results for "${q}"`} icon="🔍" tone="brand" />
-          <StatCard label="Total Match Value" value={fmtPKR(totalSales)} sub="Total value of results" icon="💰" tone="good" />
-          <StatCard label="Delivered Matched" value={String(deliveredCount)} sub={`Val: ${fmtPKR(deliveredVal)}`} icon="✅" tone="accent" />
-          <StatCard label="Active / Handed" value={String(activeHandedCount)} sub={`Val: ${fmtPKR(activeHandedVal)}`} icon="🚚" tone="warn" />
+          <StatCard label="Global Matches" value={String(totalCount)} sub={`Search results for "${q}"`} icon={<Search className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+          <StatCard label="Total Match Value" value={fmtPKR(totalSales)} sub="Total value of results" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
+          <StatCard label="Delivered Matched" value={String(deliveredCount)} sub={`Val: ${fmtPKR(deliveredVal)}`} icon={<CheckCircle2 className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
+          <StatCard label="Active / Handed" value={String(activeHandedCount)} sub={`Val: ${fmtPKR(activeHandedVal)}`} icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
         </div>
       );
     }
@@ -386,10 +405,10 @@ export default function OrdersPage() {
 
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Active Orders" value={String(totalCount)} sub="Active orders" icon="🛒" tone="brand" />
-          <StatCard label="Active Sales" value={fmtPKR(totalSales)} sub="Total active value" icon="💰" tone="good" />
-          <StatCard label="Pending Confirmation" value={String(unconfirmedCount)} sub={`Val: ${fmtPKR(unconfirmedVal)}`} icon="⏳" tone="warn" />
-          <StatCard label="Pending Fulfillment" value={String(pendingFulfillCount)} sub={`Val: ${fmtPKR(pendingFulfillVal)}`} icon="📦" tone="accent" />
+          <StatCard label="Total Active Orders" value={String(totalCount)} sub="Active orders" icon={<ShoppingCart className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+          <StatCard label="Active Sales" value={fmtPKR(totalSales)} sub="Total active value" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
+          <StatCard label="Pending Confirmation" value={String(unconfirmedCount)} sub={`Val: ${fmtPKR(unconfirmedVal)}`} icon={<Clock className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Pending Fulfillment" value={String(pendingFulfillCount)} sub={`Val: ${fmtPKR(pendingFulfillVal)}`} icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
         </div>
       );
     }
@@ -407,10 +426,10 @@ export default function OrdersPage() {
 
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Handed Orders" value={String(totalCount)} sub="With courier" icon="🚚" tone="brand" />
-          <StatCard label="Handed Sales" value={fmtPKR(totalSales)} sub="Total handed value" icon="💰" tone="good" />
-          <StatCard label="COD Amount to Receive" value={fmtPKR(codVal)} sub={`${codOrders.length} COD orders`} icon="💵" tone="warn" />
-          <StatCard label="Orders in Transit" value={String(inTransitCount)} sub={`Val: ${fmtPKR(inTransitVal)}`} icon="🛣️" tone="accent" />
+          <StatCard label="Total Handed Orders" value={String(totalCount)} sub="With courier" icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+          <StatCard label="Handed Sales" value={fmtPKR(totalSales)} sub="Total handed value" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
+          <StatCard label="COD Amount to Receive" value={fmtPKR(codVal)} sub={`${codOrders.length} COD orders`} icon={<Wallet className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Orders in Transit" value={String(inTransitCount)} sub={`Val: ${fmtPKR(inTransitVal)}`} icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
         </div>
       );
     }
@@ -424,10 +443,10 @@ export default function OrdersPage() {
 
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Delivered Orders" value={String(totalCount)} sub="Delivered & completed" icon="✅" tone="brand" />
-          <StatCard label="Total Received Sales" value={fmtPKR(totalSales)} sub="Completed sales" icon="💰" tone="good" />
-          <StatCard label="Total COD Received" value={fmtPKR(codReceived)} sub="COD collected" icon="💵" tone="accent" />
-          <StatCard label="Average Order Value" value={fmtPKR(aov)} sub="AOV per order" icon="📊" tone="warn" />
+          <StatCard label="Total Delivered Orders" value={String(totalCount)} sub="Delivered & completed" icon={<CheckCircle2 className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+          <StatCard label="Total Received Sales" value={fmtPKR(totalSales)} sub="Completed sales" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
+          <StatCard label="Total COD Received" value={fmtPKR(codReceived)} sub="COD collected" icon={<Wallet className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
+          <StatCard label="Average Order Value" value={fmtPKR(aov)} sub="AOV per order" icon={<BarChart3 className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
         </div>
       );
     }
@@ -442,10 +461,10 @@ export default function OrdersPage() {
 
     return (
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Archived Orders" value={String(totalCount)} sub="Archived orders" icon="📦" tone="brand" />
-        <StatCard label="Archived Sales Value" value={fmtPKR(totalSales)} sub="Total value archived" icon="💰" tone="good" />
-        <StatCard label="Returned / Cancelled" value={String(retCancelCount)} sub="Cancelled/returned count" icon="⚠️" tone="warn" />
-        <StatCard label="Total Lost Value" value={fmtPKR(lostVal)} sub="Lost order value" icon="❌" tone="bad" />
+        <StatCard label="Total Archived Orders" value={String(totalCount)} sub="Archived orders" icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+        <StatCard label="Archived Sales Value" value={fmtPKR(totalSales)} sub="Total value archived" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
+        <StatCard label="Returned / Cancelled" value={String(retCancelCount)} sub="Cancelled/returned count" icon={<AlertTriangle className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+        <StatCard label="Total Lost Value" value={fmtPKR(lostVal)} sub="Lost order value" icon={<XCircle className="w-5 h-5 stroke-[1.75]" />} tone="bad" />
       </div>
     );
   };
@@ -453,10 +472,11 @@ export default function OrdersPage() {
   return (
     <>
       {/* Filter Bar: Date Presets & Custom Range & Search & Sync */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-panel border border-border p-3 rounded-2xl shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 card p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted bg-panel2/60 px-3 py-1.5 rounded-xl border border-border">
-            <span>📅 Date:</span>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted bg-panel2 px-3.5 py-1.5 rounded-pill border border-border">
+            <Calendar className="w-3.5 h-3.5 stroke-[1.75]" />
+            <span>Date:</span>
             <select
               className="bg-transparent text-xs font-medium text-text focus:outline-none cursor-pointer"
               value={datePreset}
@@ -473,7 +493,7 @@ export default function OrdersPage() {
           </div>
 
           {datePreset === "custom" && (
-            <div className="flex items-center gap-2 bg-panel2/60 px-3 py-1 rounded-xl border border-border">
+            <div className="flex items-center gap-2 bg-panel2 px-3.5 py-1 rounded-pill border border-border">
               <input
                 type="date"
                 className="bg-transparent text-xs text-text focus:outline-none"
@@ -490,31 +510,32 @@ export default function OrdersPage() {
             </div>
           )}
 
-          {syncMsg && <span className="text-xs text-muted bg-panel2 px-2.5 py-1 rounded-xl border border-border">{syncMsg}</span>}
+          {syncMsg && <span className="text-xs text-muted bg-panel2 px-3 py-1 rounded-pill border border-border">{syncMsg}</span>}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-muted absolute left-3 pointer-events-none stroke-[1.75]" />
             <input
-              className="input pl-8 pr-8 py-1.5 text-xs w-[220px] sm:w-[280px]"
+              className="input !pl-9 pr-8 py-1.5 text-xs w-[220px] sm:w-[280px] !rounded-pill"
               placeholder="Search Order #, name, phone, item..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            <span className="absolute left-2.5 top-2 text-xs text-muted pointer-events-none">🔍</span>
             {q && (
               <button
                 onClick={() => setQ("")}
-                className="absolute right-2.5 top-2 text-xs text-muted hover:text-text"
+                className="absolute right-2.5 text-xs text-muted hover:text-text"
                 title="Clear search"
               >
-                ✕
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          <button className="btn-ghost whitespace-nowrap text-xs py-1.5" onClick={syncShopify} disabled={syncing}>
-            {syncing ? "Syncing…" : "🔄 Sync Shopify"}
+          <button className="btn-ghost whitespace-nowrap text-xs py-1.5 !px-4 flex items-center gap-1.5" onClick={syncShopify} disabled={syncing}>
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+            <span>{syncing ? "Syncing…" : "Sync Shopify"}</span>
           </button>
         </div>
       </div>
@@ -608,41 +629,45 @@ export default function OrdersPage() {
 
       {/* Global Search Active Notice */}
       {q && (
-        <div className="flex items-center justify-between bg-brand/10 border border-brand/20 text-brand-light px-4 py-2.5 rounded-2xl mb-4 text-xs font-medium shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🔍</span>
+        <div className="flex items-center justify-between bg-aloe border border-aloe px-4 py-3 rounded-shopify-lg mb-5 text-xs font-medium">
+          <div className="flex items-center gap-2 text-black">
+            <Search className="w-4 h-4 shrink-0 stroke-[2]" />
             <span>
-              Searching <strong>Globally across ALL sections</strong> for "<strong className="text-white">{q}</strong>" — {shown.length} order{shown.length === 1 ? "" : "s"} found. Each order displays its current workflow section badge below its order number.
+              Searching <strong>Globally across ALL sections</strong> for "<strong>{q}</strong>" — {shown.length} order{shown.length === 1 ? "" : "s"} found.
             </span>
           </div>
-          <button onClick={() => setQ("")} className="bg-panel2 hover:bg-panel text-text px-2.5 py-1 rounded-lg border border-border transition text-xs font-semibold">
-            ✕ Clear Search
+          <button onClick={() => setQ("")} className="bg-black text-white px-3 py-1 rounded-pill text-xs font-medium transition hover:bg-shade-70 flex items-center gap-1">
+            <X className="w-3 h-3" />
+            <span>Clear</span>
           </button>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="inline-flex rounded-xl bg-panel2 border border-border p-1 mb-4">
+      <div className="inline-flex rounded-pill bg-panel2 border border-border p-1 mb-5">
         {([
-          { k: "active" as const, l: `Active (${activeOrders.length})`, icon: "🛒", color: "linear-gradient(135deg,#10b981,#059669)" },
-          { k: "courierHanded" as const, l: `Courier Handed (${courierHandedOrders.length})`, icon: "🚚", color: "linear-gradient(135deg,#f59e0b,#d97706)" },
-          { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: "✅", color: "linear-gradient(135deg,#3b82f6,#2563eb)" },
-          { k: "archive" as const, l: `Archive (${archivedOrders.length})`, icon: "📦", color: "linear-gradient(135deg,#6b7280,#4b5563)" },
-        ]).map((t) => (
-          <button
-            key={t.k}
-            onClick={() => setTab(t.k)}
-            className={`px-4 py-1.5 text-xs font-medium rounded-lg transition ${
-              tab === t.k ? "text-white" : "text-muted hover:text-text"
-            }`}
-            style={tab === t.k ? { backgroundImage: t.color } : undefined}
-          >
-            {t.icon} {t.l}
-          </button>
-        ))}
+          { k: "active" as const, l: `Active (${activeOrders.length})`, icon: ShoppingCart },
+          { k: "courierHanded" as const, l: `Courier (${courierHandedOrders.length})`, icon: Truck },
+          { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: CheckCircle2 },
+          { k: "archive" as const, l: `Archive (${archivedOrders.length})`, icon: Package },
+        ]).map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-pill transition-all ${
+                tab === t.k ? "bg-text text-bg" : "text-muted hover:text-text"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              <span>{t.l}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <Card className="!p-3 overflow-hidden">
+      <Card className="!p-4 overflow-hidden">
         {loading ? (
           <div className="text-muted text-sm py-10 text-center">Loading…</div>
         ) : shown.length === 0 ? (
@@ -660,7 +685,7 @@ export default function OrdersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm text-left border-collapse">
               <thead>
-                <tr className="bg-panel2/80 text-muted uppercase font-semibold text-[11px] sm:text-xs border-b border-border tracking-wider">
+                <tr className="bg-panel2 text-muted uppercase font-medium text-eyebrow border-b border-border">
                   <th className="py-3 px-1.5 text-center whitespace-nowrap min-w-[32px]">#</th>
                   <th className="py-3 px-1 text-center whitespace-nowrap"></th>
                   <th className="py-3 px-1.5 whitespace-nowrap">Date</th>
@@ -712,12 +737,12 @@ export default function OrdersPage() {
                       <td className="py-2.5 px-1 text-center relative">
                         <button
                           onClick={() => setColorPickerOpen(colorPickerOpen === o.id ? null : o.id)}
-                          className="w-5 h-5 rounded border-0 bg-panel2/80 hover:scale-110 cursor-pointer transition inline-block"
+                          className="w-5 h-5 rounded-pill border border-border hover:scale-110 cursor-pointer transition inline-block"
                           style={{ backgroundColor: rowColor || undefined }}
                           title="Set order color"
                         />
                         {colorPickerOpen === o.id && (
-                          <div className="absolute left-6 top-1 z-50 bg-panel border border-border/40 rounded-lg shadow-xl p-2 flex gap-1.5 flex-wrap w-[140px]">
+                          <div className="absolute left-6 top-1 z-50 bg-panel border border-border rounded-shopify-lg shadow-modal p-2 flex gap-1.5 flex-wrap w-[140px]">
                             {COLOR_OPTIONS.map((c) => (
                               <button
                                 key={c.value}
@@ -726,10 +751,10 @@ export default function OrdersPage() {
                                   updateField(o.id, { labelColor: c.value } as Partial<Order>);
                                   setColorPickerOpen(null);
                                 }}
-                                className={`w-6 h-6 rounded-full border-0 transition hover:scale-110 ${
+                                className={`w-6 h-6 rounded-pill border transition hover:scale-110 ${
                                   (o.labelColor || "transparent") === c.value
-                                    ? "ring-2 ring-brand"
-                                    : "opacity-80 hover:opacity-100"
+                                    ? "ring-2 ring-text border-text"
+                                    : "border-border opacity-80 hover:opacity-100"
                                 }`}
                                 style={{ backgroundColor: c.value === "transparent" ? "transparent" : c.value }}
                               >
@@ -781,13 +806,23 @@ export default function OrdersPage() {
                               confirmationStatus: isConfirmed ? "pending" : "confirmed",
                             })
                           }
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border-0 transition ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill text-[11px] font-medium border-0 transition ${
                             isConfirmed
-                              ? "bg-good/20 text-good"
-                              : "bg-warn/20 text-warn hover:bg-warn/30"
+                              ? "bg-aloe text-black"
+                              : "bg-warn/15 text-warn hover:bg-warn/25"
                           }`}
                         >
-                          {isConfirmed ? "✓ Confirmed" : "⏳ Pending"}
+                          {isConfirmed ? (
+                            <>
+                              <Check className="w-3 h-3 stroke-[2.5]" />
+                              <span>Confirmed</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3 stroke-[2]" />
+                              <span>Pending</span>
+                            </>
+                          )}
                         </button>
                       </td>
 
@@ -796,7 +831,7 @@ export default function OrdersPage() {
                         <select
                           value={payMethod === "Online Payment" ? "Online Payment" : "COD"}
                           onChange={(e) => updateField(o.id, { paymentMethod: e.target.value })}
-                          className="bg-panel2/70 text-xs font-semibold text-text border-0 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                          className="bg-panel2 text-xs font-medium text-text border border-border rounded-shopify-sm px-1.5 py-0.5 focus:outline-none focus:border-text cursor-pointer"
                         >
                           <option value="COD">COD</option>
                           <option value="Online Payment">Online Payment</option>
@@ -809,7 +844,7 @@ export default function OrdersPage() {
                           type="checkbox"
                           checked={!!o.slipPrinted}
                           onChange={(e) => updateField(o.id, { slipPrinted: e.target.checked })}
-                          className="h-4 w-4 rounded border-0 bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
+                          className="h-4 w-4 rounded border border-border bg-panel2 text-text focus:ring-text accent-text cursor-pointer"
                           title="Checkmark if slip is printed"
                         />
                       </td>
@@ -820,7 +855,7 @@ export default function OrdersPage() {
                           type="checkbox"
                           checked={!!o.isPacked}
                           onChange={(e) => updateField(o.id, { isPacked: e.target.checked })}
-                          className="h-4 w-4 rounded border-0 bg-panel2 text-brand focus:ring-brand accent-brand cursor-pointer"
+                          className="h-4 w-4 rounded border border-border bg-panel2 text-text focus:ring-text accent-text cursor-pointer"
                         />
                       </td>
 
@@ -828,13 +863,20 @@ export default function OrdersPage() {
                       <td className="py-2.5 px-1 text-center">
                         <button
                           onClick={() => updateField(o.id, { isCourierHanded: !o.isCourierHanded })}
-                          className={`px-2 py-0.5 rounded text-[11px] font-semibold border-0 transition ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill text-[11px] font-medium border-0 transition ${
                             o.isCourierHanded
-                              ? "bg-accent/20 text-accent"
-                              : "bg-panel2/60 text-muted hover:text-text"
+                              ? "bg-pistachio text-black"
+                              : "bg-panel2 text-muted hover:text-text border border-border"
                           }`}
                         >
-                          {o.isCourierHanded ? "🚚 Dispatched" : "Handover"}
+                          {o.isCourierHanded ? (
+                            <>
+                              <Truck className="w-3 h-3 stroke-[2]" />
+                              <span>Dispatched</span>
+                            </>
+                          ) : (
+                            <span>Handover</span>
+                          )}
                         </button>
                       </td>
 
@@ -851,7 +893,7 @@ export default function OrdersPage() {
                               updateField(o.id, { customerPhone: formatted });
                             }
                           }}
-                          className="bg-transparent hover:bg-panel2/50 focus:bg-panel2 text-xs text-text border-0 outline-none rounded px-1.5 py-1 w-full transition"
+                          className="bg-transparent hover:bg-panel2 focus:bg-panel2 text-xs text-text border-0 outline-none rounded-shopify-sm px-1.5 py-1 w-full transition"
                         />
                       </td>
 
@@ -866,7 +908,7 @@ export default function OrdersPage() {
                               updateField(o.id, { remarks: e.target.value });
                             }
                           }}
-                          className="bg-panel2/40 hover:bg-panel2 focus:bg-panel2 text-xs text-text border-0 outline-none rounded-lg px-2.5 py-1 w-full transition placeholder:text-muted/40"
+                          className="bg-panel2 hover:bg-shade-30/30 focus:bg-panel2 text-xs text-text border border-border outline-none rounded-shopify-md px-2.5 py-1 w-full transition placeholder:text-muted/40"
                         />
                       </td>
 
@@ -875,7 +917,7 @@ export default function OrdersPage() {
                         <select
                           value={o.deliveryStatus || "pending under ATC"}
                           onChange={(e) => updateField(o.id, { deliveryStatus: e.target.value })}
-                          className="bg-panel2/70 text-xs text-text border-0 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                          className="bg-panel2 text-xs text-text border border-border rounded-shopify-sm px-1.5 py-1 focus:outline-none focus:border-text cursor-pointer"
                         >
                           {DELIVERY_STATUSES.map((st) => (
                             <option key={st} value={st}>
@@ -922,10 +964,10 @@ export default function OrdersPage() {
 
       {/* Edit modal */}
       {edit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setEdit(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setEdit(null)}>
           <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-lg mb-1">{edit.orderNumber} — {edit.customerName}</h3>
-            <p className="text-xs text-muted mb-4">Order details, status, contact aur notes update karo.</p>
+            <h3 className="text-heading-md mb-1">{edit.orderNumber} — {edit.customerName}</h3>
+            <p className="text-caption text-muted mb-5">Order details, status, contact aur notes update karo.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div>
@@ -1022,11 +1064,11 @@ export default function OrdersPage() {
 
       {/* Slip Print Preview Modal */}
       {printOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPrintOrder(null)}>
-          <div className="bg-white text-black p-8 rounded-2xl w-full max-w-md shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setPrintOrder(null)}>
+          <div className="bg-white text-black p-8 w-full max-w-md relative" style={{ borderRadius: '20px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-start border-b pb-4 mb-4">
               <div>
-                <h2 className="text-xl font-bold uppercase tracking-wider text-gray-900">Order Dispatch Slip</h2>
+                <h2 className="text-heading-md uppercase tracking-wider text-black">Order Dispatch Slip</h2>
                 <div className="text-xs text-gray-500 font-mono mt-0.5">Order #{printOrder.orderNumber}</div>
               </div>
               <button className="text-gray-400 hover:text-black font-bold text-lg" onClick={() => setPrintOrder(null)}>✕</button>
@@ -1061,7 +1103,7 @@ export default function OrdersPage() {
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100">
                 <span className="text-gray-500">Total Price:</span>
-                <span className="font-bold text-lg text-emerald-700">{fmtPKR(printOrder.totalPrice)}</span>
+                <span className="font-bold text-lg text-black">{fmtPKR(printOrder.totalPrice)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100">
                 <span className="text-gray-500">Payment Method:</span>
@@ -1081,16 +1123,17 @@ export default function OrdersPage() {
 
             <div className="mt-6 flex gap-3">
               <button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl shadow transition text-center"
+                className="flex-1 bg-black hover:bg-shade-70 text-white font-medium py-2.5 px-4 rounded-pill transition flex items-center justify-center gap-2 text-center"
                 onClick={() => {
                   updateField(printOrder.id, { slipPrinted: true });
                   window.print();
                 }}
               >
-                🖨️ Print Slip Now
+                <Printer className="w-4 h-4 stroke-[1.75]" />
+                <span>Print Slip Now</span>
               </button>
               <button
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-4 rounded-xl transition"
+                className="bg-shade-30 hover:bg-shade-40 text-black font-medium py-2.5 px-4 rounded-pill transition"
                 onClick={() => setPrintOrder(null)}
               >
                 Close

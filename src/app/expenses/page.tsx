@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Receipt, ClipboardList, Package, Gift } from "lucide-react";
 import { PageHeader, Card, EmptyState, StatCard } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
 import { fmtPKR, fmtDate } from "@/lib/format";
@@ -117,23 +118,23 @@ export default function ExpensesPage() {
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Kharcha" value={fmtPKR(grandTotal)} icon="🧾" tone="bad" />
+        <StatCard label="Total Kharcha" value={fmtPKR(grandTotal)} icon={<Receipt className="w-5 h-5 stroke-[1.75]" />} tone="bad" />
         <StatCard
           label="Entries"
           value={String(expenses.length)}
-          icon="📋"
+          icon={<ClipboardList className="w-5 h-5 stroke-[1.75]" />}
           tone="brand"
         />
         <StatCard
           label="Inventory"
           value={fmtPKR(byCat.get("Inventory") ?? 0)}
-          icon="📦"
+          icon={<Package className="w-5 h-5 stroke-[1.75]" />}
           tone="warn"
         />
         <StatCard
           label="Packaging"
           value={fmtPKR(byCat.get("Packaging") ?? 0)}
-          icon="🎁"
+          icon={<Gift className="w-5 h-5 stroke-[1.75]" />}
           tone="accent"
         />
       </div>
@@ -246,14 +247,14 @@ export default function ExpensesPage() {
           }
         >
           {loading ? (
-            <div className="text-muted text-sm py-10 text-center">Loading…</div>
+            <div className="text-muted text-caption py-10 text-center">Loading…</div>
           ) : shown.length === 0 ? (
             <EmptyState text="Abhi koi expense nahi." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-muted border-b border-border">
+                  <tr className="text-left text-eyebrow text-muted uppercase border-b border-border">
                     <th className="py-3 px-2">Category</th>
                     <th className="py-3 px-2">Detail</th>
                     <th className="py-3 px-2 text-right">Amount</th>
@@ -265,14 +266,14 @@ export default function ExpensesPage() {
                   {shown.map((e) => (
                     <tr
                       key={e.id}
-                      className="border-b border-border/50 hover:bg-panel2/50"
+                      className="border-b border-border hover:bg-panel2/50"
                     >
                       <td className="py-3 px-2">
-                        <span className="pill bg-panel2 text-muted">{e.category}</span>
+                        <span className="pill bg-shade-30 text-text">{e.category}</span>
                       </td>
                       <td className="py-3 px-2">
                         <div className="font-medium">{e.title}</div>
-                        <div className="text-xs text-muted">
+                        <div className="text-micro text-muted">
                           {[
                             e.vendor,
                             e.quantity && e.unitCost
@@ -284,7 +285,7 @@ export default function ExpensesPage() {
                             .join(" · ")}
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-right font-semibold">
+                      <td className="py-3 px-2 text-right font-medium">
                         {fmtPKR(e.amount)}
                       </td>
                       <td className="py-3 px-2 text-right text-muted">
