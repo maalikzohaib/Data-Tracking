@@ -21,6 +21,14 @@ type ShopifyOrder = {
   customer?: { first_name?: string; last_name?: string; phone?: string | null } | null;
   shipping_address?: { city?: string; phone?: string | null } | null;
   billing_address?: { phone?: string | null } | null;
+  fulfillments?: {
+    id?: number;
+    tracking_company?: string | null;
+    tracking_number?: string | null;
+    tracking_numbers?: string[];
+    tracking_url?: string | null;
+    shipment_status?: string | null;
+  }[];
   line_items: {
     id: number;
     title: string;

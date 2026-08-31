@@ -10,7 +10,13 @@ export async function GET(req: Request) {
   const orders = await prisma.order.findMany({
     orderBy: { shopifyCreatedAt: "desc" },
     take: limit,
-    include: { lineItems: true },
+    include: {
+      lineItems: true,
+      courierLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      },
+    },
   });
   return NextResponse.json({ orders });
 }
@@ -29,6 +35,8 @@ const createSchema = z.object({
   confirmationStatus: z.string().optional(),
   shippingAdvance: z.number().nonnegative().optional(),
   courier: z.string().optional(),
+  trackingId: z.string().optional(),
+  trackingUrl: z.string().optional(),
   paymentMethod: z.string().optional(),
   itemCount: z.number().int().positive().optional(),
   isPacked: z.boolean().optional(),
@@ -146,6 +154,8 @@ export async function POST(req: Request) {
       itemCount: d.itemCount ?? 1,
       shippingAdvance: d.shippingAdvance ?? 0,
       courier: d.courier,
+      trackingId: d.trackingId,
+      trackingUrl: d.trackingUrl,
       isPacked: d.isPacked ?? false,
       isCourierHanded: d.isCourierHanded ?? false,
       remarks: d.remarks,

@@ -70,6 +70,24 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
 
   const itemCount = o.line_items.reduce((s, li) => s + li.quantity, 0);
 
+  // Extract courier & tracking from fulfillments if present
+  let courier: string | null = null;
+  let trackingId: string | null = null;
+  let trackingUrl: string | null = null;
+  let isCourierHanded = false;
+
+  if (o.fulfillments && o.fulfillments.length > 0) {
+    const f = o.fulfillments[0];
+    trackingId = f.tracking_number || (f.tracking_numbers && f.tracking_numbers[0]) || null;
+    trackingUrl = f.tracking_url || null;
+    let company = f.tracking_company || "";
+    if (trackingUrl && trackingUrl.toLowerCase().includes("postex")) company = "PostEx";
+    else if (trackingUrl && trackingUrl.toLowerCase().includes("leopard")) company = "Leopards";
+    else if (trackingId && /^\d{14}$/.test(trackingId)) company = "PostEx";
+    else if (trackingId && /^LE/i.test(trackingId)) company = "Leopards";
+    courier = company || f.tracking_company || null;
+  }
+
   await prisma.order.upsert({
     where: { shopifyId },
     create: {
@@ -87,6 +105,11 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       financialStatus: o.financial_status,
       fulfillmentStatus: o.fulfillment_status,
       paymentMethod: paymentMethod(o),
+      // Auto-populate courier and tracking if available
+      courier,
+      trackingId,
+      trackingUrl,
+      isCourierHanded: false, // New orders start in Active section
       // NEW orders: default to "pending under ATC" and GREEN color
       deliveryStatus: "pending under ATC",
       labelColor: "#22c55e",
@@ -105,7 +128,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       },
     },
     update: {
-      // Only update Shopify-sourced fields; NEVER overwrite deliveryStatus, labelColor, or user-set fields
+      // Only update Shopify-sourced data; NEVER change sections (deliveryStatus, isCourierHanded, archived)
       orderNumber: o.name ?? String(o.order_number),
       customerName,
       customerPhone,
@@ -120,7 +143,8 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       paymentMethod: paymentMethod(o),
       itemCount,
       cogs,
-      cancelled: !!o.cancelled_at,
+      ...(courier ? { courier } : {}),
+      ...(trackingId ? { trackingId, trackingUrl } : {}),
       lineItems: {
         deleteMany: {},
         create: o.line_items.map((li) => ({

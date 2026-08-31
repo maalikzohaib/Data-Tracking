@@ -32,6 +32,15 @@ model Order {
   courier        String?  // TCS, Leopards, M&P, PostEx — manual
   trackingId     String?  // courier tracking number — optional
   trackingUrl    String?  // tracking link — optional
+
+  // PostEx & Courier Automation Fields
+  courierStatus       String?   // Raw courier status description (e.g. "Package on Route")
+  courierStatusCode   String?   // Raw courier status code (e.g. "0004")
+  courierSyncError    String?   // Last sync error message if any
+  lastCourierSyncAt   DateTime? // Last time courier tracking was checked
+  lastStatusChangeAt  DateTime? // When the status actually changed
+  rawCourierResponse  Json?     // Latest tracking response payload snapshot
+
   customerPhone  String?  // Contact Number
   itemName       String?  // Item Name override / display
   confirmationStatus String? @default("pending") // confirmed | pending
@@ -48,10 +57,13 @@ model Order {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   lineItems      OrderLineItem[]
+  courierLogs    CourierStatusLog[]
 
   @@index([shopifyCreatedAt])
   @@index([financialStatus])
   @@index([source])
+  @@index([courier])
+  @@index([trackingId])
 }
 
 model OrderLineItem {
@@ -65,6 +77,45 @@ model OrderLineItem {
   productId  String?
 
   @@index([orderId])
+}
+
+// ------------------------------------------------------------
+//  Courier Status Audit Log (Full Tracking History Trail)
+// ------------------------------------------------------------
+model CourierStatusLog {
+  id                 String   @id @default(cuid())
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId            String
+  trackingNumber     String?
+  courier            String   @default("PostEx")
+  prevInternalStatus String?
+  newInternalStatus  String
+  courierStatus      String?  // Raw message from courier
+  courierStatusCode  String?  // Status code (e.g. "0004", "0005")
+  source             String   @default("cron") // webhook | cron | manual_bulk | manual_single
+  rawPayload         Json?
+  createdAt          DateTime @default(now())
+
+  @@index([orderId])
+  @@index([trackingNumber])
+  @@index([createdAt])
+}
+
+// ------------------------------------------------------------
+//  PostEx & Courier Configuration (Stored securely server-side)
+// ------------------------------------------------------------
+model PostexConfig {
+  id                   String   @id @default("default")
+  apiToken             String?  // Stored server-side securely
+  baseUrl              String   @default("https://api.postex.pk")
+  webhookHeaderKey     String   @default("X-Postex-Auth")
+  webhookHeaderValue   String?  // Secret value to validate in incoming webhook header
+  webhookEnabled       Boolean  @default(true)
+  cronEnabled          Boolean  @default(true)
+  syncIntervalMinutes  Int      @default(60)
+  statusMapping        Json?    // Optional custom code-to-status JSON overrides
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
 }
 
 // ------------------------------------------------------------
@@ -213,7 +264,7 @@ model Loan {
 // ------------------------------------------------------------
 model SyncLog {
   id        String   @id @default(cuid())
-  source    String   // shopify, meta
+  source    String   // shopify, meta, postex
   status    String   // success, error
   message   String?
   count     Int      @default(0)

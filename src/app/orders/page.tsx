@@ -32,6 +32,17 @@ type LineItem = {
   sku: string | null;
 };
 
+type CourierLog = {
+  id: string;
+  prevInternalStatus?: string | null;
+  newInternalStatus: string;
+  courierStatus?: string | null;
+  courierStatusCode?: string | null;
+  source: string;
+  createdAt: string;
+  rawPayload?: any;
+};
+
 type Order = {
   id: string;
   source: string;
@@ -48,6 +59,13 @@ type Order = {
   courier: string | null;
   trackingId: string | null;
   trackingUrl: string | null;
+  courierStatus?: string | null;
+  courierStatusCode?: string | null;
+  courierSyncError?: string | null;
+  lastCourierSyncAt?: string | null;
+  lastStatusChangeAt?: string | null;
+  rawCourierResponse?: any;
+  courierLogs?: CourierLog[];
   confirmationStatus: string | null;
   slipPrinted: boolean;
   isPacked: boolean;
@@ -102,12 +120,32 @@ const STAGE_LABEL: Record<string, string> = {
 
 const DELIVERY_STATUSES = [
   "pending under ATC",
-  "delivered",
+  "pending",
   "in transit",
   "out for delivery",
+  "delivered",
+  "delivery attempt",
+  "under review",
+  "return initiated",
+  "return in transit",
+  "return out for delivery",
   "returned",
   "cancelled",
 ];
+
+function formatTimeAgo(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const sec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const days = Math.floor(hr / 24);
+  return `${days}d ago`;
+}
 
 const COURIER_TRACK_URL: Record<string, string> = {
   TCS: "https://www.tcsexpress.com/track/",
@@ -191,11 +229,63 @@ function isWithinDateRange(
   return true;
 }
 
+type CourierSubFilter = "all" | "delivered" | "return" | "attempt" | "pending";
+
+function matchesCourierFilter(o: Order, filter: CourierSubFilter): boolean {
+  if (filter === "all") return true;
+
+  const st = (o.deliveryStatus || "").toLowerCase();
+  const cst = (o.courierStatus || "").toLowerCase();
+
+  if (filter === "delivered") {
+    return (
+      st.includes("delivered") ||
+      st.includes("completed") ||
+      cst.includes("delivered") ||
+      cst.includes("complete")
+    );
+  }
+
+  if (filter === "return") {
+    return (
+      st.includes("return") ||
+      st.includes("returned") ||
+      cst.includes("return") ||
+      cst.includes("returned")
+    );
+  }
+
+  if (filter === "attempt") {
+    return (
+      st.includes("attempt") ||
+      st.includes("failed") ||
+      cst.includes("attempt") ||
+      cst.includes("failed")
+    );
+  }
+
+  if (filter === "pending") {
+    return (
+      st.includes("pending") ||
+      st.includes("under atc") ||
+      st.includes("review") ||
+      cst.includes("pending") ||
+      cst.includes("booked") ||
+      cst.includes("un-assigned") ||
+      cst.includes("unassigned") ||
+      cst.includes("created")
+    );
+  }
+
+  return true;
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<"active" | "courierHanded" | "delivered" | "archive">("active");
+  const [courierFilter, setCourierFilter] = useState<CourierSubFilter>("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -206,6 +296,17 @@ export default function OrdersPage() {
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [postexSyncing, setPostexSyncing] = useState(false);
+  const [postexSyncMsg, setPostexSyncMsg] = useState<{
+    checked: number;
+    updated: number;
+    unchanged: number;
+    failed: number;
+    lastSync: string;
+    errors?: string[];
+  } | null>(null);
+  const [singlePostexSyncing, setSinglePostexSyncing] = useState(false);
+  const [showRawPayload, setShowRawPayload] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null); // orderId or null
 
   const load = () =>
@@ -233,6 +334,54 @@ export default function OrdersPage() {
       setSyncMsg(`❌ ${String(e)}`);
     }
     setSyncing(false);
+  }
+
+  async function syncPostex(forceAll = false) {
+    setPostexSyncing(true);
+    setPostexSyncMsg(null);
+    try {
+      const res = await fetch("/api/postex/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ forceAll }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setPostexSyncMsg({
+          checked: j.checked,
+          updated: j.updated,
+          unchanged: j.unchanged,
+          failed: j.failed,
+          lastSync: j.lastSync,
+          errors: j.errors,
+        });
+        await load();
+      } else {
+        setSyncMsg(`❌ PostEx: ${String(j.error).slice(0, 100)}`);
+      }
+    } catch (e) {
+      setSyncMsg(`❌ PostEx Sync Error: ${String(e)}`);
+    }
+    setPostexSyncing(false);
+  }
+
+  async function syncSingleOrderPostex(orderId: string) {
+    setSinglePostexSyncing(true);
+    try {
+      const res = await fetch(`/api/postex/sync?orderId=${encodeURIComponent(orderId)}`, {
+        method: "POST",
+      });
+      const j = await res.json();
+      if (j.ok && j.order) {
+        setEdit(j.order);
+        await load();
+      } else {
+        alert(`PostEx Sync Failed: ${j.error || "Unknown error"}`);
+      }
+    } catch (e) {
+      alert(`Error syncing PostEx: ${String(e)}`);
+    }
+    setSinglePostexSyncing(false);
   }
 
   async function addOrder() {
@@ -313,11 +462,11 @@ export default function OrdersPage() {
   const isArchived = (o: Order) =>
     o.archived || o.cancelled || o.stage === "cancelled" || o.financialStatus === "voided";
 
-  // Delivered: deliveryStatus === "delivered" (and not archived)
+  // Delivered: manually marked completed/delivered and not archived
   const isDelivered = (o: Order) =>
-    !isArchived(o) && o.deliveryStatus === "delivered";
+    !isArchived(o) && o.stage === "completed";
 
-  // Courier Handed: isCourierHanded === true, but NOT yet delivered, NOT archived
+  // Courier Handed: isCourierHanded === true (dispatched), but not archived, not completed
   const isCourierHanded = (o: Order) =>
     !isArchived(o) && !isDelivered(o) && !!o.isCourierHanded;
 
@@ -357,13 +506,20 @@ export default function OrdersPage() {
     isWithinDateRange(o.shopifyCreatedAt || (o as any).createdAt, datePreset, customFrom, customTo)
   );
 
+  const courierHandedDateFiltered = dateFilteredOrders.filter(isCourierHanded);
+  const courierCountAll = courierHandedDateFiltered.length;
+  const courierCountDelivered = courierHandedDateFiltered.filter((o) => matchesCourierFilter(o, "delivered")).length;
+  const courierCountReturn = courierHandedDateFiltered.filter((o) => matchesCourierFilter(o, "return")).length;
+  const courierCountAttempt = courierHandedDateFiltered.filter((o) => matchesCourierFilter(o, "attempt")).length;
+  const courierCountPending = courierHandedDateFiltered.filter((o) => matchesCourierFilter(o, "pending")).length;
+
   // GLOBAL SEARCH: If search query 'q' is entered, search across ALL date-filtered orders regardless of current tab.
-  // TAB FILTER: If no search query, filter date-filtered orders by currently selected section tab.
+  // TAB FILTER: If no search query, filter date-filtered orders by currently selected section tab and sub-filter.
   const shown = q
     ? dateFilteredOrders.filter(bySearch)
     : dateFilteredOrders.filter((o) => {
         if (tab === "active") return isActive(o);
-        if (tab === "courierHanded") return isCourierHanded(o);
+        if (tab === "courierHanded") return isCourierHanded(o) && matchesCourierFilter(o, courierFilter);
         if (tab === "delivered") return isDelivered(o);
         return isArchived(o);
       });
@@ -537,8 +693,41 @@ export default function OrdersPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
             <span>{syncing ? "Syncing…" : "Sync Shopify"}</span>
           </button>
+
+          <button className="btn-primary whitespace-nowrap text-xs py-1.5 !px-4 flex items-center gap-1.5" onClick={() => syncPostex(false)} disabled={postexSyncing}>
+            <Truck className={`w-3.5 h-3.5 ${postexSyncing ? "animate-bounce" : ""}`} />
+            <span>{postexSyncing ? "Checking PostEx…" : "Sync PostEx"}</span>
+          </button>
         </div>
       </div>
+
+      {/* PostEx Sync Summary Banner */}
+      {postexSyncMsg && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-panel2 border border-aloe/40 px-4 py-3 rounded-shopify-lg mb-5 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-2 rounded-full bg-aloe animate-pulse" />
+            <span className="font-semibold text-text">PostEx Sync Complete</span>
+            {postexSyncMsg.checked === 0 ? (
+              <span className="text-muted">
+                0 orders had a Tracking Number. Enter tracking numbers on your orders or click <strong>Edit</strong> to sync with PostEx.
+              </span>
+            ) : (
+              <span className="text-muted">
+                Orders Checked: <strong className="text-text">{postexSyncMsg.checked}</strong> · 
+                Updated: <strong className="text-good">{postexSyncMsg.updated}</strong> · 
+                Unchanged: <strong className="text-text">{postexSyncMsg.unchanged}</strong>
+                {postexSyncMsg.failed > 0 && <> · Failed: <strong className="text-bad">{postexSyncMsg.failed}</strong></>}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-micro text-muted">Last Sync: {fmtDate(postexSyncMsg.lastSync)}</span>
+            <button onClick={() => setPostexSyncMsg(null)} className="text-muted hover:text-text">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Context-Aware Dynamic KPI Cards */}
       {renderKpiCards()}
@@ -583,7 +772,7 @@ export default function OrdersPage() {
               </select>
             </div>
             <div>
-              <label className="label">Payment Type</label>
+              <label className="label">Payment Method</label>
               <select className="input" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
                 <option value="COD">COD</option>
                 <option value="Online Payment">Online Payment</option>
@@ -643,36 +832,81 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="inline-flex rounded-pill bg-panel2 border border-border p-1 mb-5">
-        {([
-          { k: "active" as const, l: `Active (${activeOrders.length})`, icon: ShoppingCart },
-          { k: "courierHanded" as const, l: `Courier (${courierHandedOrders.length})`, icon: Truck },
-          { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: CheckCircle2 },
-          { k: "archive" as const, l: `Archive (${archivedOrders.length})`, icon: Package },
-        ]).map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.k}
-              onClick={() => setTab(t.k)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-pill transition-all ${
-                tab === t.k ? "bg-text text-bg" : "text-muted hover:text-text"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span>{t.l}</span>
-            </button>
-          );
-        })}
+      {/* Section Tabs & Courier Sub-Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="inline-flex rounded-pill bg-panel2 border border-border p-1">
+          {([
+            { k: "active" as const, l: `Active (${activeOrders.length})`, icon: ShoppingCart },
+            { k: "courierHanded" as const, l: `Courier (${courierHandedOrders.length})`, icon: Truck },
+            { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: CheckCircle2 },
+            { k: "archive" as const, l: `Archive (${archivedOrders.length})`, icon: Package },
+          ]).map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.k}
+                onClick={() => {
+                  setTab(t.k);
+                  if (t.k === "courierHanded") setCourierFilter("all");
+                }}
+                className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-pill transition-all ${
+                  tab === t.k ? "bg-text text-bg shadow-sm font-semibold" : "text-muted hover:text-text"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{t.l}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Courier Status Sub-Filters (Only inside Courier section) */}
+        {tab === "courierHanded" && (
+          <div className="inline-flex rounded-pill bg-panel2 border border-border p-1 gap-1">
+            {[
+              { k: "all" as const, l: "All", count: courierCountAll },
+              { k: "delivered" as const, l: "Delivered", count: courierCountDelivered },
+              { k: "return" as const, l: "Return", count: courierCountReturn },
+              { k: "attempt" as const, l: "Delivery Attempt", count: courierCountAttempt },
+              { k: "pending" as const, l: "Pending", count: courierCountPending },
+            ].map((sf) => (
+              <button
+                key={sf.k}
+                onClick={() => setCourierFilter(sf.k)}
+                className={`px-3 py-1 text-xs font-medium rounded-pill transition-all ${
+                  courierFilter === sf.k
+                    ? "bg-aloe text-black shadow-sm font-semibold"
+                    : "text-muted hover:text-text hover:bg-panel"
+                }`}
+              >
+                {sf.l} <span className="opacity-75">({sf.count})</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <Card className="!p-4 overflow-hidden">
-        {loading ? (
-          <div className="text-muted text-sm py-10 text-center">Loading…</div>
-        ) : shown.length === 0 ? (
+      {/* Orders table */}
+      <Card
+        title={
+          tab === "active" ? "Active Orders" :
+          tab === "courierHanded" ? (courierFilter === "all" ? "Courier Handed Orders" : `Courier Handed — ${courierFilter === "attempt" ? "Delivery Attempt" : courierFilter === "return" ? "Return" : courierFilter.charAt(0).toUpperCase() + courierFilter.slice(1)}`) :
+          tab === "delivered" ? "Delivered Orders" :
+          "Archived Orders"
+        }
+        action={
+          <div className="flex items-center gap-2">
+            <button className="btn-primary flex items-center gap-1 text-xs !py-1.5 !px-3" onClick={() => setShowForm(!showForm)}>
+              <span>{showForm ? "✕ Close" : "+ Naya Order"}</span>
+            </button>
+          </div>
+        }
+      >
+        {shown.length === 0 ? (
           <EmptyState text={
-            q
+            loading
+              ? "Orders load ho rahe hain…"
+              : q
               ? `No orders found matching "${q}" in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : "Archive"}.`
               : datePreset !== "all"
               ? `No orders found for selected date filter in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : "Archive"}.`
@@ -720,7 +954,6 @@ export default function OrdersPage() {
                   const isConfirmed = o.confirmationStatus === "confirmed";
                   const payMethod = o.paymentMethod || "COD";
                   const rowColor = o.labelColor && o.labelColor !== "transparent" && o.labelColor !== "#transparent" ? o.labelColor : null;
-                  const section = getOrderSection(o);
 
                   return (
                     <tr
@@ -769,18 +1002,23 @@ export default function OrdersPage() {
                         {fmtDate(o.shopifyCreatedAt)}
                       </td>
 
-                      {/* 2. Order No # */}
+                      {/* 2. Order No # (Clickable to View Details) */}
                       <td className="py-2.5 px-2 font-bold text-text whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span>{o.orderNumber || "—"}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEdit(o)}
+                          className="flex items-center gap-1.5 hover:text-aloe text-left group"
+                          title="Click to view full order & courier tracking details"
+                        >
+                          <span className="underline decoration-dotted underline-offset-2">{o.orderNumber || "—"}</span>
+                          <FileEdit className="w-3 h-3 opacity-0 group-hover:opacity-100 text-muted transition" />
                           {o.source === "manual" && <span className="text-[10px] text-brand-light" title="Manual order">✍</span>}
-                        </div>
+                        </button>
                       </td>
 
                       {/* 3. Name */}
                       <td className="py-2.5 px-2 font-medium text-text">
                         {o.customerName || "—"}
-                        {o.customerCity && <div className="text-[10px] text-muted">{o.customerCity}</div>}
                       </td>
 
                       {/* 4. Item Name */}
@@ -914,22 +1152,36 @@ export default function OrdersPage() {
 
                       {/* 14. Status */}
                       <td className="py-2.5 px-2">
-                        <select
-                          value={o.deliveryStatus || "pending under ATC"}
-                          onChange={(e) => updateField(o.id, { deliveryStatus: e.target.value })}
-                          className="bg-panel2 text-xs text-text border border-border rounded-shopify-sm px-1.5 py-1 focus:outline-none focus:border-text cursor-pointer"
-                        >
-                          {DELIVERY_STATUSES.map((st) => (
-                            <option key={st} value={st}>
-                              {st}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex flex-col gap-1">
+                          <select
+                            value={o.deliveryStatus || "pending under ATC"}
+                            onChange={(e) => updateField(o.id, { deliveryStatus: e.target.value })}
+                            className="bg-panel2 text-xs text-text border border-border rounded-shopify-sm px-1.5 py-1 focus:outline-none focus:border-text cursor-pointer capitalize"
+                          >
+                            {DELIVERY_STATUSES.map((st) => (
+                              <option key={st} value={st}>
+                                {st}
+                              </option>
+                            ))}
+                          </select>
+                          {o.courier && (
+                            <div className="text-[10px] text-aloe font-medium">
+                              {o.courier}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
-                      {/* 15 & 16. Actions */}
+                      {/* 15 & 16. Actions: View & Archive/Restore */}
                       <td className="py-2.5 px-2 text-right whitespace-nowrap">
-                        {tab === "active" ? (
+                        <button
+                          type="button"
+                          onClick={() => setEdit(o)}
+                          className="btn-ghost !py-1 !px-3 text-xs mr-2 font-medium text-text hover:text-aloe inline-flex items-center gap-1"
+                        >
+                          <span>View</span>
+                        </button>
+                        {!isArchived(o) ? (
                           <button
                             className="text-muted hover:text-text hover:underline text-xs"
                             onClick={() => setArchived(o.id, true)}
@@ -938,14 +1190,12 @@ export default function OrdersPage() {
                             Archive
                           </button>
                         ) : (
-                          o.archived && (
-                            <button
-                              className="text-brand-light hover:underline text-xs"
-                              onClick={() => setArchived(o.id, false)}
-                            >
-                              Restore
-                            </button>
-                          )
+                          <button
+                            className="text-brand-light hover:underline text-xs"
+                            onClick={() => setArchived(o.id, false)}
+                          >
+                            Restore
+                          </button>
                         )}
                         {o.source === "manual" && (
                           <button className="text-bad hover:underline text-xs ml-2" onClick={() => delOrder(o.id)}>
@@ -962,12 +1212,66 @@ export default function OrdersPage() {
         )}
       </Card>
 
-      {/* Edit modal */}
+      {/* View & Edit modal */}
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setEdit(null)}>
           <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-heading-md mb-1">{edit.orderNumber} — {edit.customerName}</h3>
-            <p className="text-caption text-muted mb-5">Order details, status, contact aur notes update karo.</p>
+            <div className="flex items-start justify-between border-b border-border pb-4 mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-heading-md">{edit.orderNumber || "Order"} — {edit.customerName || "Customer"}</h3>
+                  {edit.source === "manual" && <span className="pill text-micro bg-brand-light/10 text-brand-light">Manual</span>}
+                </div>
+                <p className="text-caption text-muted mt-0.5">Order details & automated courier tracking summary.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrintOrder(edit);
+                    setEdit(null);
+                  }}
+                  className="btn-ghost !py-1 !px-3 text-xs flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Slip</span>
+                </button>
+                <button type="button" onClick={() => setEdit(null)} className="text-muted hover:text-text p-1">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Prominent Courier & Tracking Info Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5 p-3.5 rounded-shopify-lg bg-panel2 border border-border">
+              <div className="p-2.5 rounded bg-panel border border-border/70">
+                <div className="text-micro text-muted font-medium uppercase tracking-wider">Order Number</div>
+                <div className="font-bold text-sm text-text mt-0.5">{edit.orderNumber || "—"}</div>
+              </div>
+              <div className="p-2.5 rounded bg-panel border border-border/70">
+                <div className="text-micro text-muted font-medium uppercase tracking-wider">Courier Name</div>
+                <div className="font-semibold text-sm text-aloe mt-0.5">{edit.courier || "PostEx"}</div>
+              </div>
+              <div className="p-2.5 rounded bg-panel border border-border/70">
+                <div className="text-micro text-muted font-medium uppercase tracking-wider">Tracking ID</div>
+                <div className="font-mono font-semibold text-xs text-text mt-1 truncate">
+                  {edit.trackingId ? (
+                    <a
+                      href={edit.trackingUrl || `https://merchant.postex.pk/tracking?trackingNumber=${encodeURIComponent(edit.trackingId)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-aloe hover:underline inline-flex items-center gap-1"
+                      title="Open PostEx tracking portal"
+                    >
+                      <span>{edit.trackingId}</span>
+                      <span className="text-[10px]">↗</span>
+                    </a>
+                  ) : (
+                    <span className="text-muted font-normal italic">Auto-fetching via PostEx</span>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div>
@@ -1025,6 +1329,15 @@ export default function OrdersPage() {
                 </select>
               </div>
               <div>
+                <label className="label">Tracking Number (PostEx / Courier)</label>
+                <input
+                  className="input font-mono"
+                  placeholder="e.g. CX-123456789"
+                  value={edit.trackingId || ""}
+                  onChange={(e) => setEdit({ ...edit, trackingId: e.target.value })}
+                />
+              </div>
+              <div>
                 <label className="label">Shipping Advance (PKR)</label>
                 <input className="input" type="number" value={edit.shippingAdvance} onChange={(e) => setEdit({ ...edit, shippingAdvance: parseFloat(e.target.value) || 0 })} />
               </div>
@@ -1051,6 +1364,100 @@ export default function OrdersPage() {
                 <input className="input" value={edit.specialDetails || ""} onChange={(e) => setEdit({ ...edit, specialDetails: e.target.value })} />
               </div>
             </div>
+
+            {/* PostEx Tracking & Journey Section */}
+            {(edit.courier?.toLowerCase() === "postex" || edit.trackingId || edit.courierStatus) && (
+              <div className="mt-5 p-4 rounded-shopify-lg bg-panel2 border border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-aloe" />
+                    <span className="font-semibold text-xs text-text uppercase tracking-wider">PostEx Courier Tracking</span>
+                    {edit.trackingId && (
+                      <span className="text-micro font-mono bg-panel px-2 py-0.5 rounded border border-border text-text">
+                        {edit.trackingId}
+                      </span>
+                    )}
+                  </div>
+                  {edit.trackingId && (
+                    <button
+                      type="button"
+                      onClick={() => syncSingleOrderPostex(edit.id)}
+                      disabled={singlePostexSyncing}
+                      className="btn-ghost !py-1 !px-3 text-xs flex items-center gap-1.5"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${singlePostexSyncing ? "animate-spin" : ""}`} />
+                      <span>{singlePostexSyncing ? "Syncing…" : "Sync Now"}</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3 text-xs">
+                  <div className="p-2 rounded bg-panel border border-border/60">
+                    <div className="text-micro text-muted">Courier Status (Actual)</div>
+                    <div className="font-medium text-text mt-0.5">{edit.courierStatus || "Not Synced"}</div>
+                  </div>
+                  <div className="p-2 rounded bg-panel border border-border/60">
+                    <div className="text-micro text-muted">Status Code</div>
+                    <div className="font-mono font-medium text-text mt-0.5">{edit.courierStatusCode || "—"}</div>
+                  </div>
+                  <div className="p-2 rounded bg-panel border border-border/60">
+                    <div className="text-micro text-muted">Section Status (Manual)</div>
+                    <div className="font-medium text-aloe mt-0.5 capitalize">{edit.deliveryStatus || "—"}</div>
+                  </div>
+                  <div className="p-2 rounded bg-panel border border-border/60">
+                    <div className="text-micro text-muted">Last Synced</div>
+                    <div className="text-text mt-0.5">{edit.lastCourierSyncAt ? formatTimeAgo(edit.lastCourierSyncAt) : "Never"}</div>
+                  </div>
+                </div>
+
+                {edit.courierSyncError && (
+                  <div className="mb-3 text-xs text-bad bg-bad/10 p-2.5 rounded border border-bad/20">
+                    ⚠️ {edit.courierSyncError}
+                  </div>
+                )}
+
+                {/* Tracking History Log Trail */}
+                {edit.courierLogs && edit.courierLogs.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-micro uppercase tracking-wider text-muted font-medium mb-2">Status Audit History</div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {edit.courierLogs.map((log) => (
+                        <div key={log.id} className="flex items-start justify-between text-micro p-2 rounded bg-panel border border-border/40">
+                          <div>
+                            <span className="font-semibold text-text">{log.courierStatus || log.newInternalStatus}</span>
+                            {log.courierStatusCode && <span className="font-mono text-muted ml-1.5">[{log.courierStatusCode}]</span>}
+                            <div className="text-muted mt-0.5">
+                              {log.prevInternalStatus ? `${log.prevInternalStatus} → ` : ""}
+                              <span className="text-good">{log.newInternalStatus}</span>
+                              <span className="text-muted/60 ml-2">via {log.source}</span>
+                            </div>
+                          </div>
+                          <span className="text-muted whitespace-nowrap ml-3">{fmtDate(log.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Raw API Response toggle */}
+                {edit.rawCourierResponse && (
+                  <div className="mt-3 pt-2 border-t border-border/40">
+                    <button
+                      type="button"
+                      onClick={() => setShowRawPayload(!showRawPayload)}
+                      className="text-micro text-muted hover:text-text underline"
+                    >
+                      {showRawPayload ? "Hide Raw API Payload" : "View Raw PostEx API Payload"}
+                    </button>
+                    {showRawPayload && (
+                      <pre className="mt-2 p-2.5 rounded bg-black text-gray-200 text-[10px] font-mono overflow-x-auto max-h-48">
+                        {JSON.stringify(edit.rawCourierResponse, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2 pt-5">
               <button className="btn-primary flex-1" onClick={saveEdit} disabled={saving}>
