@@ -6,6 +6,9 @@ import AppShell from "@/components/AppShell";
 export const metadata: Metadata = {
   title: "Business Tracker",
   description: "Shopify + Meta ads business tracking dashboard (PKR)",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
