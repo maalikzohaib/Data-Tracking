@@ -436,6 +436,17 @@ export default function SettingsPage() {
             </li>
             <li className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-good shrink-0" />
+              <span>SHOPIFY_WEBHOOK_SECRET (for HMAC signature security)</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-good shrink-0" />
+              <span>
+                Shopify Webhook URL:{" "}
+                <code className="text-text bg-panel2 px-1.5 py-0.5 rounded-shopify-xs text-micro">/api/webhooks/shopify</code>
+              </span>
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-good shrink-0" />
               <span>META_ACCESS_TOKEN + META_AD_ACCOUNT_ID</span>
             </li>
             <li className="flex items-center gap-2">

@@ -61,23 +61,74 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchStats = (showLoader = false) => {
+    if (showLoader) setLoading(true);
+    return fetch(`/api/stats?range=${range}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) setError(d.hint || d.error);
+        else {
+          setData(d);
+          setError(null);
+        }
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     setLoading(true);
-    fetch("/api/meta/sync", { method: "POST" })
+    fetch("/api/meta/sync")
       .catch(() => {})
       .finally(() => {
-        fetch(`/api/stats?range=${range}`)
-          .then((r) => r.json())
-          .then((d) => {
-            if (d.error) setError(d.hint || d.error);
-            else {
-              setData(d);
-              setError(null);
-            }
-          })
-          .catch((e) => setError(String(e)))
-          .finally(() => setLoading(false));
+        fetchStats(true);
       });
+
+    let es: EventSource | null = null;
+    let reconnectTimer: NodeJS.Timeout;
+
+    function connectSSE() {
+      try {
+        es = new EventSource("/api/events");
+        es.onmessage = (event) => {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (
+              parsed.type === "order:created" ||
+              parsed.type === "order:updated" ||
+              parsed.type === "shopify:sync" ||
+              parsed.type === "meta:sync"
+            ) {
+              fetchStats(false);
+            }
+          } catch {
+            // keepalive
+          }
+        };
+        es.onerror = () => {
+          es?.close();
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(connectSSE, 5000);
+        };
+      } catch {
+        // SSE not supported
+      }
+    }
+
+    connectSSE();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchStats(false);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      es?.close();
+      clearTimeout(reconnectTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [range]);
 
   const o = data?.overview;

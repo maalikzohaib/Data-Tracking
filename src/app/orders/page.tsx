@@ -316,6 +316,52 @@ export default function OrdersPage() {
 
   useEffect(() => {
     load();
+
+    let es: EventSource | null = null;
+    let reconnectTimer: NodeJS.Timeout;
+
+    function connectSSE() {
+      try {
+        es = new EventSource("/api/events");
+        es.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (
+              data.type === "order:created" ||
+              data.type === "order:updated" ||
+              data.type === "shopify:sync" ||
+              data.type === "postex:sync"
+            ) {
+              load();
+            }
+          } catch {
+            // Ignore non-json or keepalive messages
+          }
+        };
+        es.onerror = () => {
+          es?.close();
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(connectSSE, 5000);
+        };
+      } catch {
+        // SSE connection failure fallback
+      }
+    }
+
+    connectSSE();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        load();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      es?.close();
+      clearTimeout(reconnectTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   async function syncShopify() {

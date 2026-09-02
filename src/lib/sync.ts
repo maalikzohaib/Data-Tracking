@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { fetchShopifyOrders, fetchShopifyProducts, type ShopifyOrder } from "./shopify";
 import { fetchMetaInsights } from "./meta";
+import { broadcastEvent } from "./events";
 
 function num(v?: string | null): number {
   const n = parseFloat(v ?? "0");
@@ -143,6 +144,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       paymentMethod: paymentMethod(o),
       itemCount,
       cogs,
+      cancelled: !!o.cancelled_at,
       ...(courier ? { courier } : {}),
       ...(trackingId ? { trackingId, trackingUrl } : {}),
       lineItems: {
@@ -199,6 +201,8 @@ export async function syncShopifyOrders(sinceISO?: string): Promise<number> {
   await prisma.syncLog.create({
     data: { source: "shopify-orders", status: "success", count: orders.length },
   });
+
+  broadcastEvent("shopify:sync", { count: orders.length });
   return orders.length;
 }
 
@@ -232,6 +236,7 @@ export async function syncShopifyProducts(): Promise<number> {
   await prisma.syncLog.create({
     data: { source: "shopify-products", status: "success", count },
   });
+  broadcastEvent("shopify:products", { count });
   return count;
 }
 
@@ -286,5 +291,6 @@ export async function syncMeta(): Promise<number> {
   await prisma.syncLog.create({
     data: { source: "meta", status: "success", count: rows.length },
   });
+  broadcastEvent("meta:sync", { count: rows.length });
   return rows.length;
 }

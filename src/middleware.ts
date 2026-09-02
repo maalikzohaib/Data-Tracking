@@ -4,10 +4,13 @@ import type { NextRequest } from "next/server";
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // Allow static files, api auth endpoints, and internal assets
+  // Allow static files, api auth endpoints, webhooks, cron, and real-time events
   if (
     path.startsWith("/_next") ||
     path.startsWith("/api/auth/login") ||
+    path.startsWith("/api/webhooks") ||
+    path.startsWith("/api/cron") ||
+    path.startsWith("/api/events") ||
     path === "/favicon.ico"
   ) {
     return NextResponse.next();

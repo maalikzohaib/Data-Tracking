@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPostexConfig, PostexTrackData } from "@/lib/postex";
 import { normalizePostexStatus } from "@/lib/postex-status";
+import { broadcastEvent } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,10 @@ export async function POST(req: Request) {
       });
 
       processedCount++;
+    }
+
+    if (processedCount > 0) {
+      broadcastEvent("postex:sync", { processed: processedCount });
     }
 
     return NextResponse.json({
