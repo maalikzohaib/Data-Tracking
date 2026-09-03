@@ -29,7 +29,8 @@ model Order {
   itemCount      Int      @default(0)
   cogs           Float    @default(0) // cost of goods (manual: khud enter, shopify: SKU se)
   shippingAdvance Float   @default(0) // courier ko hand-paid advance (per order) — manual
-  courier        String?  // TCS, Leopards, M&P, PostEx — manual
+  courier        String?  // TCS, Leopards, M&P, PostEx, Run Courier — manual
+  courierProvider String? // "postex" | "run_courier" — determines which API to call for sync
   trackingId     String?  // courier tracking number — optional
   trackingUrl    String?  // tracking link — optional
 
@@ -116,6 +117,16 @@ model PostexConfig {
   statusMapping        Json?    // Optional custom code-to-status JSON overrides
   updatedAt            DateTime @updatedAt
   createdAt            DateTime @default(now())
+}
+
+// ------------------------------------------------------------
+//  Run Courier Configuration (Stored securely server-side)
+// ------------------------------------------------------------
+model RunCourierConfig {
+  id        String   @id @default("default")
+  authKey   String?  // Stored server-side securely
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }
 
 // ------------------------------------------------------------

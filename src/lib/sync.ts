@@ -73,6 +73,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
 
   // Extract courier & tracking from fulfillments if present
   let courier: string | null = null;
+  let courierProvider: string | null = null;
   let trackingId: string | null = null;
   let trackingUrl: string | null = null;
   let isCourierHanded = false;
@@ -82,10 +83,25 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
     trackingId = f.tracking_number || (f.tracking_numbers && f.tracking_numbers[0]) || null;
     trackingUrl = f.tracking_url || null;
     let company = f.tracking_company || "";
-    if (trackingUrl && trackingUrl.toLowerCase().includes("postex")) company = "PostEx";
-    else if (trackingUrl && trackingUrl.toLowerCase().includes("leopard")) company = "Leopards";
-    else if (trackingId && /^\d{14}$/.test(trackingId)) company = "PostEx";
-    else if (trackingId && /^LE/i.test(trackingId)) company = "Leopards";
+    if (trackingUrl && trackingUrl.toLowerCase().includes("runcourier")) {
+      company = "Run Courier";
+      courierProvider = "run_courier";
+    } else if (trackingUrl && trackingUrl.toLowerCase().includes("postex")) {
+      company = "PostEx";
+      courierProvider = "postex";
+    } else if (trackingUrl && trackingUrl.toLowerCase().includes("leopard")) {
+      company = "Leopards";
+    } else if (trackingId && /^\d{14}$/.test(trackingId)) {
+      company = "PostEx";
+      courierProvider = "postex";
+    } else if (trackingId && /^LE/i.test(trackingId)) {
+      company = "Leopards";
+    }
+    // Detect Run Courier from tracking company name
+    if (company.toLowerCase().includes("run courier") || company.toLowerCase().includes("runcourier")) {
+      courierProvider = "run_courier";
+      company = "Run Courier";
+    }
     courier = company || f.tracking_company || null;
   }
 
@@ -108,6 +124,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       paymentMethod: paymentMethod(o),
       // Auto-populate courier and tracking if available
       courier,
+      courierProvider,
       trackingId,
       trackingUrl,
       isCourierHanded: false, // New orders start in Active section
@@ -146,6 +163,7 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       cogs,
       cancelled: !!o.cancelled_at,
       ...(courier ? { courier } : {}),
+      ...(courierProvider ? { courierProvider } : {}),
       ...(trackingId ? { trackingId, trackingUrl } : {}),
       lineItems: {
         deleteMany: {},

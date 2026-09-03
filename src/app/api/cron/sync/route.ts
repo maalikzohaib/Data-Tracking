@@ -3,6 +3,8 @@ import { isCronAuthorized } from "@/lib/env";
 import { syncShopifyOrders, syncShopifyProducts, syncMeta } from "@/lib/sync";
 import { syncPostexOrders } from "@/lib/postex-sync";
 import { getPostexConfig } from "@/lib/postex";
+import { getRunCourierConfig } from "@/lib/runcourier";
+import { syncRunCourierOrders } from "@/lib/runcourier-sync";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +53,19 @@ export async function GET(req: Request) {
   } catch (e) {
     result.postexError = String(e);
     await logError("postex", e);
+  }
+
+  // 5. Run Courier tracking reconciliation
+  try {
+    const rcConfig = await getRunCourierConfig();
+    if (rcConfig.authKey) {
+      result.runCourier = await syncRunCourierOrders({ source: "cron" });
+    } else {
+      result.runCourier = { skipped: true, reason: "No auth key" };
+    }
+  } catch (e) {
+    result.runCourierError = String(e);
+    await logError("runcourier", e);
   }
 
   return NextResponse.json({ ok: true, syncedAt: new Date().toISOString(), result });

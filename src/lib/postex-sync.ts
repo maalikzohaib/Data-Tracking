@@ -44,6 +44,8 @@ export async function syncPostexOrders(options: SyncOptions = {}): Promise<Poste
           { courier: "" },
         ],
       },
+      // Never sync Run Courier orders via PostEx
+      { courierProvider: { not: "run_courier" } },
     ],
   };
 

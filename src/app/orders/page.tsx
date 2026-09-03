@@ -19,6 +19,7 @@ import {
   Calendar,
   X,
   FileEdit,
+  RotateCcw,
 } from "lucide-react";
 import { PageHeader, Card, Pill, StatCard, EmptyState } from "@/components/ui";
 import { apiGet, apiSend } from "@/lib/client";
@@ -57,6 +58,7 @@ type Order = {
   stage: string | null;
   shippingAdvance: number;
   courier: string | null;
+  courierProvider: string | null;
   trackingId: string | null;
   trackingUrl: string | null;
   courierStatus?: string | null;
@@ -83,7 +85,7 @@ type Order = {
   lineItems?: LineItem[];
 };
 
-const COURIERS = ["", "TCS", "Leopards", "M&P", "PostEx", "Trax", "Daewoo", "Other"];
+const COURIERS = ["", "TCS", "Leopards", "M&P", "PostEx", "Run Courier", "Trax", "Daewoo", "Other"];
 const STAGES = ["processing", "shipped", "completed", "cancelled"] as const;
 
 // Color palette for order row labels (10 main colors + None)
@@ -151,6 +153,7 @@ const COURIER_TRACK_URL: Record<string, string> = {
   TCS: "https://www.tcsexpress.com/track/",
   Leopards: "https://www.leopardscourier.com/tracking",
   PostEx: "https://merchant.postex.pk/tracking",
+  "Run Courier": "https://portal.runcourier.com",
   "M&P": "https://mulphilog.com/",
   Trax: "https://sonic.pk/tracking",
   Daewoo: "https://www.daewoo.com.pk/",
@@ -284,8 +287,9 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState<"active" | "courierHanded" | "delivered" | "archive">("active");
+  const [tab, setTab] = useState<"active" | "courierHanded" | "delivered" | "rto" | "archive">("active");
   const [courierFilter, setCourierFilter] = useState<CourierSubFilter>("all");
+  const [rtoCourierFilter, setRtoCourierFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -306,6 +310,16 @@ export default function OrdersPage() {
     errors?: string[];
   } | null>(null);
   const [singlePostexSyncing, setSinglePostexSyncing] = useState(false);
+  const [rcSyncing, setRcSyncing] = useState(false);
+  const [rcSyncMsg, setRcSyncMsg] = useState<{
+    checked: number;
+    updated: number;
+    unchanged: number;
+    failed: number;
+    lastSync: string;
+    errors?: string[];
+  } | null>(null);
+  const [singleRcSyncing, setSingleRcSyncing] = useState(false);
   const [showRawPayload, setShowRawPayload] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null); // orderId or null
 
@@ -330,7 +344,8 @@ export default function OrdersPage() {
               data.type === "order:created" ||
               data.type === "order:updated" ||
               data.type === "shopify:sync" ||
-              data.type === "postex:sync"
+              data.type === "postex:sync" ||
+              data.type === "runcourier:sync"
             ) {
               load();
             }
@@ -430,6 +445,68 @@ export default function OrdersPage() {
     setSinglePostexSyncing(false);
   }
 
+  async function syncRunCourier(forceAll = false) {
+    setRcSyncing(true);
+    setRcSyncMsg(null);
+    try {
+      const res = await fetch("/api/runcourier/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ forceAll }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setRcSyncMsg({
+          checked: j.checked,
+          updated: j.updated,
+          unchanged: j.unchanged,
+          failed: j.failed,
+          lastSync: j.lastSync,
+          errors: j.errors,
+        });
+        await load();
+      } else {
+        setSyncMsg(`❌ Run Courier: ${String(j.error).slice(0, 100)}`);
+      }
+    } catch (e) {
+      setSyncMsg(`❌ Run Courier Sync Error: ${String(e)}`);
+    }
+    setRcSyncing(false);
+  }
+
+  async function syncSingleOrderRunCourier(orderId: string) {
+    setSingleRcSyncing(true);
+    try {
+      const res = await fetch(`/api/runcourier/sync?orderId=${encodeURIComponent(orderId)}`, {
+        method: "POST",
+      });
+      const j = await res.json();
+      if (j.ok && j.order) {
+        setEdit(j.order);
+        await load();
+      } else {
+        alert(`Run Courier Sync Failed: ${j.error || "Unknown error"}`);
+      }
+    } catch (e) {
+      alert(`Error syncing Run Courier: ${String(e)}`);
+    }
+    setSingleRcSyncing(false);
+  }
+
+  /** Dispatch single-order sync to correct provider based on courierProvider field */
+  function syncSingleOrder(order: Order) {
+    if (order.courierProvider === "run_courier") {
+      syncSingleOrderRunCourier(order.id);
+    } else {
+      syncSingleOrderPostex(order.id);
+    }
+  }
+
+  function isSingleSyncing(order: Order) {
+    if (order.courierProvider === "run_courier") return singleRcSyncing;
+    return singlePostexSyncing;
+  }
+
   async function addOrder() {
     if (!form.customerName || !form.totalPrice) return;
     setSaving(true);
@@ -442,6 +519,7 @@ export default function OrdersPage() {
       cogs: form.cogs ? parseFloat(form.cogs) : 0,
       shippingAdvance: form.shippingAdvance ? parseFloat(form.shippingAdvance) : 0,
       courier: form.courier || undefined,
+      courierProvider: form.courier === "Run Courier" ? "run_courier" : form.courier === "PostEx" ? "postex" : undefined,
       stage: form.stage,
       confirmationStatus: form.confirmationStatus,
       paymentMethod: form.paymentMethod || "COD",
@@ -469,6 +547,7 @@ export default function OrdersPage() {
       confirmationStatus: edit.confirmationStatus || "pending",
       paymentMethod: edit.paymentMethod || "COD",
       courier: edit.courier || undefined,
+      courierProvider: edit.courier === "Run Courier" ? "run_courier" : edit.courier === "PostEx" ? "postex" : (edit.courierProvider || undefined),
       shippingAdvance: edit.shippingAdvance || 0,
       totalPrice: edit.totalPrice,
       cogs: edit.cogs,
@@ -508,13 +587,19 @@ export default function OrdersPage() {
   const isArchived = (o: Order) =>
     o.archived || o.cancelled || o.stage === "cancelled" || o.financialStatus === "voided";
 
-  // Delivered: manually marked completed/delivered and not archived
+  // Delivered: manually marked completed/delivered, or courier status is delivered
   const isDelivered = (o: Order) =>
-    !isArchived(o) && o.stage === "completed";
+    !isArchived(o) && (o.stage === "completed" || o.deliveryStatus?.toLowerCase() === "delivered");
 
-  // Courier Handed: isCourierHanded === true (dispatched), but not archived, not completed
+  // Courier Handed: isCourierHanded === true (dispatched), or courier tracking shows in transit/out for delivery/attempt/return
   const isCourierHanded = (o: Order) =>
-    !isArchived(o) && !isDelivered(o) && !!o.isCourierHanded;
+    !isArchived(o) && !isDelivered(o) && (
+      !!o.isCourierHanded ||
+      o.deliveryStatus?.toLowerCase() === "in transit" ||
+      o.deliveryStatus?.toLowerCase() === "out for delivery" ||
+      o.deliveryStatus?.toLowerCase() === "delivery attempt" ||
+      o.deliveryStatus?.toLowerCase().includes("return")
+    );
 
   // Active: everything else (not courier handed, not delivered, not archived)
   const isActive = (o: Order) =>
@@ -542,9 +627,41 @@ export default function OrdersPage() {
     o.customerCity?.toLowerCase().includes(q.toLowerCase()) ||
     o.remarks?.toLowerCase().includes(q.toLowerCase());
 
+  const isRtoOrder = (o: Order) => {
+    const ds = (o.deliveryStatus || "").toLowerCase();
+    const cs = (o.courierStatus || "").toLowerCase();
+    return (
+      ds.includes("return") ||
+      ds === "returned" ||
+      cs.includes("return") ||
+      cs.includes("rts") ||
+      cs.includes("returned to shipper") ||
+      cs.includes("parcel return")
+    );
+  };
+
+  const getOrderCourierGroup = (o: Order): string => {
+    if (o.courierProvider === "run_courier" || (o.courier && o.courier.toLowerCase().includes("run"))) {
+      if (o.courier && o.courier.toLowerCase().includes("leopard")) return "Run Courier (Leopard)";
+      if (o.trackingId && /^LE/i.test(o.trackingId)) return "Run Courier (Leopard)";
+      return "Run Courier";
+    }
+    if (o.courier?.toLowerCase() === "postex" || (!o.courier && o.trackingId && /^\d{14}$/.test(o.trackingId))) {
+      return "PostEx";
+    }
+    if (o.courier?.toLowerCase().includes("leopard") || (o.trackingId && /^LE/i.test(o.trackingId))) {
+      return "Leopards";
+    }
+    if (o.courier?.toLowerCase().includes("tcs") || (o.trackingId && /^TCS/i.test(o.trackingId))) {
+      return "TCS";
+    }
+    return o.courier || "Other";
+  };
+
   const activeOrders = orders.filter(isActive);
   const courierHandedOrders = orders.filter(isCourierHanded);
   const deliveredOrders = orders.filter(isDelivered);
+  const rtoOrders = orders.filter(isRtoOrder);
   const archivedOrders = orders.filter(isArchived);
 
   // All orders filtered by selected date preset / custom range
@@ -559,6 +676,32 @@ export default function OrdersPage() {
   const courierCountAttempt = courierHandedDateFiltered.filter((o) => matchesCourierFilter(o, "attempt")).length;
   const courierCountPending = courierHandedDateFiltered.filter((o) => matchesCourierFilter(o, "pending")).length;
 
+  const rtoDateFiltered = dateFilteredOrders.filter(isRtoOrder);
+
+  // Calculate RTO stats by courier
+  const courierRtoMap = new Map<string, { name: string; total: number; rtoCount: number; rtoValue: number }>();
+  for (const o of dateFilteredOrders) {
+    const courierName = getOrderCourierGroup(o);
+    if (!courierRtoMap.has(courierName)) {
+      courierRtoMap.set(courierName, { name: courierName, total: 0, rtoCount: 0, rtoValue: 0 });
+    }
+    const stat = courierRtoMap.get(courierName)!;
+    stat.total++;
+    if (isRtoOrder(o)) {
+      stat.rtoCount++;
+      stat.rtoValue += o.totalPrice || 0;
+    }
+  }
+
+  const courierRtoStats = Array.from(courierRtoMap.values())
+    .filter((c) => c.rtoCount > 0 || c.total > 0)
+    .sort((a, b) => b.rtoCount - a.rtoCount);
+
+  const totalDispatched = dateFilteredOrders.filter((o) => o.isCourierHanded || isDelivered(o) || isRtoOrder(o)).length || dateFilteredOrders.length;
+  const overallRtoRate = totalDispatched > 0 ? ((rtoDateFiltered.length / totalDispatched) * 100).toFixed(1) : "0";
+  const rtoTotalValue = rtoDateFiltered.reduce((sum, o) => sum + o.totalPrice, 0);
+  const topRtoCourier = courierRtoStats.find((c) => c.rtoCount > 0);
+
   // GLOBAL SEARCH: If search query 'q' is entered, search across ALL date-filtered orders regardless of current tab.
   // TAB FILTER: If no search query, filter date-filtered orders by currently selected section tab and sub-filter.
   const shown = q
@@ -567,6 +710,11 @@ export default function OrdersPage() {
         if (tab === "active") return isActive(o);
         if (tab === "courierHanded") return isCourierHanded(o) && matchesCourierFilter(o, courierFilter);
         if (tab === "delivered") return isDelivered(o);
+        if (tab === "rto") {
+          if (!isRtoOrder(o)) return false;
+          if (rtoCourierFilter === "all") return true;
+          return getOrderCourierGroup(o) === rtoCourierFilter;
+        }
         return isArchived(o);
       });
 
@@ -649,6 +797,45 @@ export default function OrdersPage() {
           <StatCard label="Total Received Sales" value={fmtPKR(totalSales)} sub="Completed sales" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
           <StatCard label="Total COD Received" value={fmtPKR(codReceived)} sub="COD collected" icon={<Wallet className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
           <StatCard label="Average Order Value" value={fmtPKR(aov)} sub="AOV per order" icon={<BarChart3 className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+        </div>
+      );
+    }
+
+    if (tab === "rto") {
+      const filteredRtoCount = shown.length;
+      const filteredRtoVal = shown.reduce((sum, o) => sum + o.totalPrice, 0);
+      const inTransitRtos = shown.filter((o) => (o.deliveryStatus || "").toLowerCase().includes("transit")).length;
+
+      return (
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <StatCard
+            label={rtoCourierFilter === "all" ? "Total RTO Orders" : `${rtoCourierFilter} RTOs`}
+            value={String(filteredRtoCount)}
+            sub={`Overall RTO Rate: ${overallRtoRate}%`}
+            icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />}
+            tone="brand"
+          />
+          <StatCard
+            label="Total RTO Loss Value"
+            value={fmtPKR(filteredRtoVal)}
+            sub="Returned product value"
+            icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />}
+            tone="warn"
+          />
+          <StatCard
+            label="Dispatched vs Returned"
+            value={`${rtoDateFiltered.length} / ${totalDispatched}`}
+            sub={`${overallRtoRate}% of shipments returned`}
+            icon={<Truck className="w-5 h-5 stroke-[1.75]" />}
+            tone="brand"
+          />
+          <StatCard
+            label="In Transit to Origin"
+            value={String(inTransitRtos)}
+            sub={`${filteredRtoCount - inTransitRtos} fully returned`}
+            icon={<AlertTriangle className="w-5 h-5 stroke-[1.75]" />}
+            tone="accent"
+          />
         </div>
       );
     }
@@ -744,6 +931,11 @@ export default function OrdersPage() {
             <Truck className={`w-3.5 h-3.5 ${postexSyncing ? "animate-bounce" : ""}`} />
             <span>{postexSyncing ? "Checking PostEx…" : "Sync PostEx"}</span>
           </button>
+
+          <button className="btn-primary whitespace-nowrap text-xs py-1.5 !px-4 flex items-center gap-1.5" onClick={() => syncRunCourier(false)} disabled={rcSyncing} style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+            <Truck className={`w-3.5 h-3.5 ${rcSyncing ? "animate-bounce" : ""}`} />
+            <span>{rcSyncing ? "Checking Run Courier…" : "Sync Run Courier"}</span>
+          </button>
         </div>
       </div>
 
@@ -769,6 +961,34 @@ export default function OrdersPage() {
           <div className="flex items-center gap-3">
             <span className="text-micro text-muted">Last Sync: {fmtDate(postexSyncMsg.lastSync)}</span>
             <button onClick={() => setPostexSyncMsg(null)} className="text-muted hover:text-text">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Run Courier Sync Summary Banner */}
+      {rcSyncMsg && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-panel2 border border-[#8b5cf6]/40 px-4 py-3 rounded-shopify-lg mb-5 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-2 rounded-full bg-[#8b5cf6] animate-pulse" />
+            <span className="font-semibold text-text">Run Courier Sync Complete</span>
+            {rcSyncMsg.checked === 0 ? (
+              <span className="text-muted">
+                0 orders with Run Courier provider found. Set courier to &quot;Run Courier&quot; and add tracking numbers to sync.
+              </span>
+            ) : (
+              <span className="text-muted">
+                Orders Checked: <strong className="text-text">{rcSyncMsg.checked}</strong> · 
+                Updated: <strong className="text-good">{rcSyncMsg.updated}</strong> · 
+                Unchanged: <strong className="text-text">{rcSyncMsg.unchanged}</strong>
+                {rcSyncMsg.failed > 0 && <> · Failed: <strong className="text-bad">{rcSyncMsg.failed}</strong></>}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-micro text-muted">Last Sync: {fmtDate(rcSyncMsg.lastSync)}</span>
+            <button onClick={() => setRcSyncMsg(null)} className="text-muted hover:text-text">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -885,6 +1105,7 @@ export default function OrdersPage() {
             { k: "active" as const, l: `Active (${activeOrders.length})`, icon: ShoppingCart },
             { k: "courierHanded" as const, l: `Courier (${courierHandedOrders.length})`, icon: Truck },
             { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: CheckCircle2 },
+            { k: "rto" as const, l: `RTO Calculation (${rtoDateFiltered.length})`, icon: RotateCcw },
             { k: "archive" as const, l: `Archive (${archivedOrders.length})`, icon: Package },
           ]).map((t) => {
             const Icon = t.icon;
@@ -894,6 +1115,7 @@ export default function OrdersPage() {
                 onClick={() => {
                   setTab(t.k);
                   if (t.k === "courierHanded") setCourierFilter("all");
+                  if (t.k === "rto") setRtoCourierFilter("all");
                 }}
                 className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-pill transition-all ${
                   tab === t.k ? "bg-text text-bg shadow-sm font-semibold" : "text-muted hover:text-text"
@@ -930,6 +1152,35 @@ export default function OrdersPage() {
             ))}
           </div>
         )}
+
+        {/* RTO Courier Company Sub-Filters (Only inside RTO section) */}
+        {tab === "rto" && (
+          <div className="inline-flex rounded-pill bg-panel2 border border-border p-1 gap-1 flex-wrap">
+            <button
+              onClick={() => setRtoCourierFilter("all")}
+              className={`px-3 py-1 text-xs font-medium rounded-pill transition-all ${
+                rtoCourierFilter === "all"
+                  ? "bg-aloe text-black shadow-sm font-semibold"
+                  : "text-muted hover:text-text hover:bg-panel"
+              }`}
+            >
+              All Couriers <span className="opacity-80">({rtoDateFiltered.length})</span>
+            </button>
+            {courierRtoStats.map((c) => (
+              <button
+                key={c.name}
+                onClick={() => setRtoCourierFilter(c.name)}
+                className={`px-3 py-1 text-xs font-medium rounded-pill transition-all ${
+                  rtoCourierFilter === c.name
+                    ? "bg-aloe text-black shadow-sm font-semibold"
+                    : "text-muted hover:text-text hover:bg-panel"
+                }`}
+              >
+                {c.name} <span className="opacity-80">({c.rtoCount})</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Orders table */}
@@ -938,6 +1189,7 @@ export default function OrdersPage() {
           tab === "active" ? "Active Orders" :
           tab === "courierHanded" ? (courierFilter === "all" ? "Courier Handed Orders" : `Courier Handed — ${courierFilter === "attempt" ? "Delivery Attempt" : courierFilter === "return" ? "Return" : courierFilter.charAt(0).toUpperCase() + courierFilter.slice(1)}`) :
           tab === "delivered" ? "Delivered Orders" :
+          tab === "rto" ? (rtoCourierFilter === "all" ? `RTO Orders — All Couriers (${shown.length})` : `RTO Orders — ${rtoCourierFilter} (${shown.length})`) :
           "Archived Orders"
         }
         action={
@@ -948,18 +1200,84 @@ export default function OrdersPage() {
           </div>
         }
       >
+        {/* RTO Analysis Breakdown Bar (Only in RTO section) — clean, borderless cards */}
+        {tab === "rto" && (
+          <div className="mb-5 p-3.5 rounded-shopify-lg bg-panel2">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <span className="font-semibold text-xs text-text uppercase tracking-wider">
+                  RTO Analysis by Courier Company
+                </span>
+                <span className="text-micro text-muted ml-2">
+                  (Overall RTO Rate: <strong className="text-text font-bold">{overallRtoRate}%</strong> · {rtoDateFiltered.length} returned out of {totalDispatched} dispatched)
+                </span>
+              </div>
+              {rtoCourierFilter !== "all" && (
+                <button
+                  onClick={() => setRtoCourierFilter("all")}
+                  className="text-micro text-aloe hover:underline flex items-center gap-1"
+                >
+                  Show All Couriers
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {courierRtoStats.map((c) => {
+                const cRate = c.total > 0 ? ((c.rtoCount / c.total) * 100).toFixed(1) : "0";
+                const isSelected = rtoCourierFilter === c.name;
+                return (
+                  <div
+                    key={c.name}
+                    onClick={() => setRtoCourierFilter(isSelected ? "all" : c.name)}
+                    className={`p-3.5 rounded-shopify-md bg-panel transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-aloe/15"
+                        : "hover:bg-panel2"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-text">{c.name}</span>
+                      <span className={`pill text-micro font-semibold ${isSelected ? "bg-aloe text-black" : "bg-panel2 text-text"}`}>
+                        {c.rtoCount} RTO{c.rtoCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 text-micro text-muted">
+                      <div>
+                        <div>RTO Rate</div>
+                        <div className="font-semibold text-text mt-0.5">{cRate}%</div>
+                      </div>
+                      <div>
+                        <div>RTO Value</div>
+                        <div className="font-semibold text-text mt-0.5">{fmtPKR(c.rtoValue)}</div>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-muted mt-2 flex items-center justify-between">
+                      <span>{c.total} orders dispatched</span>
+                      <span className={isSelected ? "text-good font-semibold" : "text-muted"}>
+                        {isSelected ? "Active filter ✓" : "Click to filter"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {shown.length === 0 ? (
           <EmptyState text={
             loading
               ? "Orders load ho rahe hain…"
               : q
-              ? `No orders found matching "${q}" in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : "Archive"}.`
+              ? `No orders found matching "${q}" in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : tab === "rto" ? "RTO Calculation" : "Archive"}.`
               : datePreset !== "all"
-              ? `No orders found for selected date filter in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : "Archive"}.`
+              ? `No orders found for selected date filter in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : tab === "rto" ? "RTO Calculation" : "Archive"}.`
               : tab === "active" ? "No active orders found." :
                 tab === "courierHanded" ? "No courier handed orders found." :
                 tab === "delivered" ? "No delivered orders found." :
-                "Archive is empty."
+                tab === "rto" ? (rtoCourierFilter === "all" ? "No RTO orders found for selected criteria." : `No RTO orders found for ${rtoCourierFilter}.`) :
+                "No archived orders found."
           } />
         ) : (
           <div className="overflow-x-auto">
@@ -1295,25 +1613,33 @@ export default function OrdersPage() {
                 <div className="font-bold text-sm text-text mt-0.5">{edit.orderNumber || "—"}</div>
               </div>
               <div className="p-2.5 rounded bg-panel border border-border/70">
-                <div className="text-micro text-muted font-medium uppercase tracking-wider">Courier Name</div>
-                <div className="font-semibold text-sm text-aloe mt-0.5">{edit.courier || "PostEx"}</div>
+                <div className="text-micro text-muted font-medium uppercase tracking-wider">Courier Provider</div>
+                <div className="font-semibold text-sm mt-0.5" style={{ color: edit.courierProvider === "run_courier" ? "#8b5cf6" : undefined }}>
+                  {edit.courier || (edit.courierProvider === "run_courier" ? "Run Courier" : "PostEx")}
+                  {edit.courierProvider === "run_courier" && edit.courier && edit.courier !== "Run Courier" && (
+                    <span className="text-micro text-muted ml-1.5">via Run Courier</span>
+                  )}
+                </div>
               </div>
               <div className="p-2.5 rounded bg-panel border border-border/70">
                 <div className="text-micro text-muted font-medium uppercase tracking-wider">Tracking ID</div>
                 <div className="font-mono font-semibold text-xs text-text mt-1 truncate">
                   {edit.trackingId ? (
                     <a
-                      href={edit.trackingUrl || `https://merchant.postex.pk/tracking?trackingNumber=${encodeURIComponent(edit.trackingId)}`}
+                      href={edit.trackingUrl || (edit.courierProvider === "run_courier" ? `https://portal.runcourier.com` : `https://merchant.postex.pk/tracking?trackingNumber=${encodeURIComponent(edit.trackingId)}`)}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-aloe hover:underline inline-flex items-center gap-1"
-                      title="Open PostEx tracking portal"
+                      className="hover:underline inline-flex items-center gap-1"
+                      style={{ color: edit.courierProvider === "run_courier" ? "#8b5cf6" : undefined }}
+                      title={`Open ${edit.courierProvider === "run_courier" ? "Run Courier" : "PostEx"} tracking portal`}
                     >
                       <span>{edit.trackingId}</span>
                       <span className="text-[10px]">↗</span>
                     </a>
                   ) : (
-                    <span className="text-muted font-normal italic">Auto-fetching via PostEx</span>
+                    <span className="text-muted font-normal italic">
+                      {edit.courierProvider === "run_courier" ? "Enter tracking number to sync with Run Courier" : "Auto-fetching via PostEx"}
+                    </span>
                   )}
                 </div>
               </div>
@@ -1368,7 +1694,18 @@ export default function OrdersPage() {
               </div>
               <div>
                 <label className="label">Courier</label>
-                <select className="input" value={edit.courier || ""} onChange={(e) => setEdit({ ...edit, courier: e.target.value })}>
+                <select
+                  className="input"
+                  value={edit.courier || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEdit({
+                      ...edit,
+                      courier: val,
+                      courierProvider: val === "Run Courier" ? "run_courier" : val === "PostEx" ? "postex" : edit.courierProvider,
+                    });
+                  }}
+                >
                   {COURIERS.map((c) => (
                     <option key={c} value={c}>{c || "— select —"}</option>
                   ))}
@@ -1411,13 +1748,15 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            {/* PostEx Tracking & Journey Section */}
-            {(edit.courier?.toLowerCase() === "postex" || edit.trackingId || edit.courierStatus) && (
+            {/* Courier Tracking & Journey Section */}
+            {(edit.courier?.toLowerCase() === "postex" || edit.courierProvider === "run_courier" || edit.trackingId || edit.courierStatus) && (
               <div className="mt-5 p-4 rounded-shopify-lg bg-panel2 border border-border">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-aloe" />
-                    <span className="font-semibold text-xs text-text uppercase tracking-wider">PostEx Courier Tracking</span>
+                    <Truck className="w-4 h-4" style={{ color: edit.courierProvider === "run_courier" ? "#8b5cf6" : undefined }} />
+                    <span className="font-semibold text-xs text-text uppercase tracking-wider">
+                      {edit.courierProvider === "run_courier" ? "Run Courier Tracking" : "PostEx Courier Tracking"}
+                    </span>
                     {edit.trackingId && (
                       <span className="text-micro font-mono bg-panel px-2 py-0.5 rounded border border-border text-text">
                         {edit.trackingId}
@@ -1427,12 +1766,12 @@ export default function OrdersPage() {
                   {edit.trackingId && (
                     <button
                       type="button"
-                      onClick={() => syncSingleOrderPostex(edit.id)}
-                      disabled={singlePostexSyncing}
+                      onClick={() => syncSingleOrder(edit)}
+                      disabled={isSingleSyncing(edit)}
                       className="btn-ghost !py-1 !px-3 text-xs flex items-center gap-1.5"
                     >
-                      <RefreshCw className={`w-3 h-3 ${singlePostexSyncing ? "animate-spin" : ""}`} />
-                      <span>{singlePostexSyncing ? "Syncing…" : "Sync Now"}</span>
+                      <RefreshCw className={`w-3 h-3 ${isSingleSyncing(edit) ? "animate-spin" : ""}`} />
+                      <span>{isSingleSyncing(edit) ? "Syncing…" : "Sync Now"}</span>
                     </button>
                   )}
                 </div>
@@ -1493,7 +1832,7 @@ export default function OrdersPage() {
                       onClick={() => setShowRawPayload(!showRawPayload)}
                       className="text-micro text-muted hover:text-text underline"
                     >
-                      {showRawPayload ? "Hide Raw API Payload" : "View Raw PostEx API Payload"}
+                      {showRawPayload ? "Hide Raw API Payload" : `View Raw ${edit.courierProvider === "run_courier" ? "Run Courier" : "PostEx"} API Payload`}
                     </button>
                     {showRawPayload && (
                       <pre className="mt-2 p-2.5 rounded bg-black text-gray-200 text-[10px] font-mono overflow-x-auto max-h-48">
