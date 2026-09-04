@@ -59,7 +59,8 @@ export async function POST(req: Request) {
     // Process & upsert order idempotently
     await upsertOrder(order);
 
-    const orderLabel = order.name ?? String(order.order_number ?? order.id);
+    const rawOrderLabel = order.name ?? String(order.order_number ?? order.id);
+    const orderLabel = rawOrderLabel.startsWith("#") ? rawOrderLabel : `#${rawOrderLabel}`;
 
     // Record sync log for audit trail (visible in Settings > Sync Logs)
     await prisma.syncLog.create({
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
         source: "shopify-webhook",
         status: "success",
         count: 1,
-        message: `${topic} — #${orderLabel} (${order.customer ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim() : "Guest"})`,
+        message: `${topic} — ${orderLabel} (${order.customer ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim() : "Guest"})`,
       },
     }).catch(() => {});
 
