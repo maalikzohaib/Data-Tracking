@@ -318,7 +318,7 @@ export default function OrdersPage() {
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<"active" | "courierHanded" | "attempt" | "delivered" | "rto" | "cancelled">("active");
   const [courierFilter, setCourierFilter] = useState<CourierSubFilter>("all");
-  const [rtoCourierFilter, setRtoCourierFilter] = useState<string>("all");
+  const [rtoCourierFilter, setRtoCourierFilter] = useState<"all" | "PostEx" | "Leopard" | "Run Courier">("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
@@ -735,22 +735,24 @@ export default function OrdersPage() {
     );
   };
 
-  const getOrderCourierGroup = (o: Order): string => {
-    if (o.courierProvider === "run_courier" || (o.courier && o.courier.toLowerCase().includes("run"))) {
-      if (o.courier && o.courier.toLowerCase().includes("leopard")) return "Run Courier (Leopard)";
-      if (o.trackingId && /^LE/i.test(o.trackingId)) return "Run Courier (Leopard)";
+  const getOrderCourierGroup = (o: Order): "PostEx" | "Leopard" | "Run Courier" | null => {
+    const cp = (o.courierProvider || "").toLowerCase();
+    const c = (o.courier || "").toLowerCase();
+    const tr = (o.trackingId || "").toUpperCase();
+
+    // 1. Run Courier
+    if (cp === "run_courier" || c.includes("run")) {
       return "Run Courier";
     }
-    if (o.courier?.toLowerCase() === "postex" || (!o.courier && o.trackingId && /^\d{14}$/.test(o.trackingId))) {
+    // 2. PostEx
+    if (cp === "postex" || c.includes("postex") || (!o.courier && /^\d{14}$/.test(tr))) {
       return "PostEx";
     }
-    if (o.courier?.toLowerCase().includes("leopard") || (o.trackingId && /^LE/i.test(o.trackingId))) {
-      return "Leopards";
+    // 3. Leopard
+    if (c.includes("leopard") || tr.startsWith("LE")) {
+      return "Leopard";
     }
-    if (o.courier?.toLowerCase().includes("tcs") || (o.trackingId && /^TCS/i.test(o.trackingId))) {
-      return "TCS";
-    }
-    return o.courier || "Other";
+    return null;
   };
 
   const activeOrders = orders.filter(isActive);
@@ -774,13 +776,17 @@ export default function OrdersPage() {
 
   const rtoDateFiltered = dateFilteredOrders.filter(isRtoOrder);
 
-  // Calculate RTO stats by courier
-  const courierRtoMap = new Map<string, { name: string; total: number; rtoCount: number; rtoValue: number }>();
+  // 3 Target Courier Companies for RTO Tracking: PostEx, Leopard, Run Courier (no "Other")
+  const TARGET_RTO_COURIERS = ["PostEx", "Leopard", "Run Courier"] as const;
+
+  const courierRtoMap = new Map<string, { name: "PostEx" | "Leopard" | "Run Courier"; total: number; rtoCount: number; rtoValue: number }>();
+  for (const name of TARGET_RTO_COURIERS) {
+    courierRtoMap.set(name, { name, total: 0, rtoCount: 0, rtoValue: 0 });
+  }
+
   for (const o of dateFilteredOrders) {
     const courierName = getOrderCourierGroup(o);
-    if (!courierRtoMap.has(courierName)) {
-      courierRtoMap.set(courierName, { name: courierName, total: 0, rtoCount: 0, rtoValue: 0 });
-    }
+    if (!courierName || !courierRtoMap.has(courierName)) continue;
     const stat = courierRtoMap.get(courierName)!;
     stat.total++;
     if (isRtoOrder(o)) {
@@ -789,14 +795,10 @@ export default function OrdersPage() {
     }
   }
 
-  const courierRtoStats = Array.from(courierRtoMap.values())
-    .filter((c) => c.rtoCount > 0 || c.total > 0)
-    .sort((a, b) => b.rtoCount - a.rtoCount);
-
-  const totalDispatched = dateFilteredOrders.filter((o) => o.isCourierHanded || isDelivered(o) || isRtoOrder(o) || isAttempt(o)).length || dateFilteredOrders.length;
+  const courierRtoStats = TARGET_RTO_COURIERS.map((name) => courierRtoMap.get(name)!);
+  const totalDispatched = courierRtoStats.reduce((sum, c) => sum + c.total, 0) || dateFilteredOrders.length;
   const overallRtoRate = totalDispatched > 0 ? ((rtoDateFiltered.length / totalDispatched) * 100).toFixed(1) : "0";
   const rtoTotalValue = rtoDateFiltered.reduce((sum, o) => sum + o.totalPrice, 0);
-  const topRtoCourier = courierRtoStats.find((c) => c.rtoCount > 0);
 
   // GLOBAL SEARCH: If search query 'q' is entered, search across ALL date-filtered orders regardless of current tab.
   // TAB FILTER: If no search query, filter date-filtered orders by currently selected section tab and sub-filter.
@@ -902,18 +904,22 @@ export default function OrdersPage() {
       const filteredRtoCount = shown.length;
       const filteredRtoVal = shown.reduce((sum, o) => sum + o.totalPrice, 0);
       const inTransitRtos = shown.filter((o) => (o.deliveryStatus || "").toLowerCase().includes("transit")).length;
+      const selectedStat = courierRtoStats.find((c) => c.name === rtoCourierFilter);
+      const courierRate = selectedStat && selectedStat.total > 0
+        ? ((selectedStat.rtoCount / selectedStat.total) * 100).toFixed(1)
+        : overallRtoRate;
 
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatCard
-            label={rtoCourierFilter === "all" ? "Total RTO Orders" : `${rtoCourierFilter} RTOs`}
+            label={rtoCourierFilter === "all" ? "Total RTO Orders" : `${rtoCourierFilter} RTO Orders`}
             value={String(filteredRtoCount)}
-            sub={`Overall RTO Rate: ${overallRtoRate}%`}
+            sub={rtoCourierFilter === "all" ? `Overall Return Ratio: ${overallRtoRate}%` : `${rtoCourierFilter} Return Ratio: ${courierRate}%`}
             icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />}
             tone="brand"
           />
           <StatCard
-            label="Total RTO Loss Value"
+            label={rtoCourierFilter === "all" ? "Total RTO Loss Value" : `${rtoCourierFilter} Loss Value`}
             value={fmtPKR(filteredRtoVal)}
             sub="Returned product value"
             icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />}
@@ -921,8 +927,8 @@ export default function OrdersPage() {
           />
           <StatCard
             label="Dispatched vs Returned"
-            value={`${rtoDateFiltered.length} / ${totalDispatched}`}
-            sub={`${overallRtoRate}% of shipments returned`}
+            value={rtoCourierFilter === "all" ? `${rtoDateFiltered.length} / ${totalDispatched}` : `${filteredRtoCount} / ${selectedStat?.total || filteredRtoCount}`}
+            sub={`${rtoCourierFilter === "all" ? overallRtoRate : courierRate}% return ratio`}
             icon={<Truck className="w-5 h-5 stroke-[1.75]" />}
             tone="brand"
           />
@@ -1266,7 +1272,7 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {/* RTO Courier Company Sub-Filters (Only inside RTO section) */}
+        {/* RTO Courier Company Sub-Filters (Only inside RTO section: All, PostEx, Leopard, Run Courier) */}
         {tab === "rto" && (
           <div className="inline-flex rounded-pill bg-panel2 border border-border p-1 gap-1 flex-wrap">
             <button
@@ -1314,29 +1320,29 @@ export default function OrdersPage() {
           </div>
         }
       >
-        {/* RTO Analysis Breakdown Bar (Only in RTO section) — clean, borderless cards */}
+        {/* RTO Analysis Breakdown Bar (Only in RTO section: 3 couriers - PostEx, Leopard, Run Courier) */}
         {tab === "rto" && (
-          <div className="mb-5 p-3.5 rounded-shopify-lg bg-panel2">
+          <div className="mb-5 p-3.5 rounded-shopify-lg bg-panel2 border border-border/40">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <span className="font-semibold text-xs text-text uppercase tracking-wider">
-                  RTO Analysis by Courier Company
+                  Courier Return Ratio Analysis
                 </span>
                 <span className="text-micro text-muted ml-2">
-                  (Overall RTO Rate: <strong className="text-text font-bold">{overallRtoRate}%</strong> · {rtoDateFiltered.length} returned out of {totalDispatched} dispatched)
+                  (Overall Return Ratio: <strong className="text-text font-bold">{overallRtoRate}%</strong> · {rtoDateFiltered.length} returned out of {totalDispatched} dispatched)
                 </span>
               </div>
               {rtoCourierFilter !== "all" && (
                 <button
                   onClick={() => setRtoCourierFilter("all")}
-                  className="text-micro text-aloe hover:underline flex items-center gap-1"
+                  className="text-micro text-aloe hover:underline flex items-center gap-1 font-medium cursor-pointer"
                 >
                   Show All Couriers
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {courierRtoStats.map((c) => {
                 const cRate = c.total > 0 ? ((c.rtoCount / c.total) * 100).toFixed(1) : "0";
                 const isSelected = rtoCourierFilter === c.name;
@@ -1344,32 +1350,37 @@ export default function OrdersPage() {
                   <div
                     key={c.name}
                     onClick={() => setRtoCourierFilter(isSelected ? "all" : c.name)}
-                    className={`p-3.5 rounded-shopify-md bg-panel transition-all cursor-pointer ${
+                    className={`p-3.5 rounded-shopify-md bg-panel transition-all cursor-pointer border ${
                       isSelected
-                        ? "bg-aloe/15"
-                        : "hover:bg-panel2"
+                        ? "border-aloe/60 bg-aloe/10 shadow-sm ring-1 ring-aloe/40"
+                        : "border-transparent hover:border-border hover:bg-panel/80"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs text-text">{c.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Truck className={`w-3.5 h-3.5 ${isSelected ? "text-aloe" : "text-muted"}`} />
+                        <span className="font-semibold text-xs text-text">{c.name}</span>
+                      </div>
                       <span className={`pill text-micro font-semibold ${isSelected ? "bg-aloe text-black" : "bg-panel2 text-text"}`}>
                         {c.rtoCount} RTO{c.rtoCount === 1 ? "" : "s"}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 text-micro text-muted">
+                    <div className="grid grid-cols-2 gap-2 mt-2.5 pt-2 border-t border-border/50 text-micro text-muted">
                       <div>
-                        <div>RTO Rate</div>
-                        <div className="font-semibold text-text mt-0.5">{cRate}%</div>
+                        <div>Return Ratio</div>
+                        <div className={`font-bold text-xs mt-0.5 ${parseFloat(cRate) > 20 ? "text-bad" : parseFloat(cRate) > 10 ? "text-warn" : "text-text"}`}>
+                          {cRate}%
+                        </div>
                       </div>
                       <div>
-                        <div>RTO Value</div>
+                        <div>RTO Loss</div>
                         <div className="font-semibold text-text mt-0.5">{fmtPKR(c.rtoValue)}</div>
                       </div>
                     </div>
-                    <div className="text-[10px] text-muted mt-2 flex items-center justify-between">
-                      <span>{c.total} orders dispatched</span>
-                      <span className={isSelected ? "text-good font-semibold" : "text-muted"}>
-                        {isSelected ? "Active filter ✓" : "Click to filter"}
+                    <div className="text-[10px] text-muted mt-2 pt-1 flex items-center justify-between border-t border-border/30">
+                      <span>{c.total} dispatched</span>
+                      <span className={isSelected ? "text-aloe font-semibold" : "text-muted hover:text-text"}>
+                        {isSelected ? "Filtered ✓" : "Click to filter"}
                       </span>
                     </div>
                   </div>
