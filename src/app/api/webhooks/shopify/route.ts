@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyShopifyWebhook } from "@/lib/webhook";
+import { verifyShopifyWebhook, isConfiguredSecret } from "@/lib/webhook";
 import { upsertOrder } from "@/lib/sync";
 import type { ShopifyOrder } from "@/lib/shopify";
 import { prisma } from "@/lib/prisma";
@@ -24,11 +24,17 @@ export async function POST(req: Request) {
   const shopDomain = req.headers.get("x-shopify-shop-domain") || "";
   const webhookId = req.headers.get("x-shopify-webhook-id") || "";
 
-  // Signature verification (when SHOPIFY_WEBHOOK_SECRET is configured)
+  // Signature verification (only enforced when a valid, non-placeholder SHOPIFY_WEBHOOK_SECRET is configured)
   const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET;
-  if (webhookSecret && !verifyShopifyWebhook(raw, hmac)) {
-    console.error(`[Shopify Webhook] Invalid signature from ${shopDomain || "unknown"}`);
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  if (isConfiguredSecret(webhookSecret)) {
+    if (!verifyShopifyWebhook(raw, hmac)) {
+      console.error(`[Shopify Webhook] Invalid signature from ${shopDomain || "unknown"}`);
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+  } else {
+    console.warn(
+      `[Shopify Webhook] Signature verification bypassed: SHOPIFY_WEBHOOK_SECRET is unset or has dummy placeholder value.`
+    );
   }
 
   try {

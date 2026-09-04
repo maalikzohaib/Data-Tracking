@@ -58,18 +58,19 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
     return li.name || li.title;
   }
 
-  const itemNames = o.line_items.map(formatLineItemTitle).join(", ");
+  const lineItems = o.line_items || [];
+  const itemNames = lineItems.map(formatLineItemTitle).join(", ");
 
   // COGS: use cached product prices for speed
   const buyBySku = await getBuyPriceMap();
   let cogs = 0;
-  for (const li of o.line_items) {
+  for (const li of lineItems) {
     if (li.sku && buyBySku.has(li.sku)) {
-      cogs += (buyBySku.get(li.sku) ?? 0) * li.quantity;
+      cogs += (buyBySku.get(li.sku) ?? 0) * (li.quantity || 1);
     }
   }
 
-  const itemCount = o.line_items.reduce((s, li) => s + li.quantity, 0);
+  const itemCount = lineItems.reduce((s, li) => s + (li.quantity || 1), 0);
 
   // Extract courier & tracking from fulfillments if present
   let courier: string | null = null;
@@ -136,10 +137,10 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       cancelled: !!o.cancelled_at,
       shopifyCreatedAt: new Date(o.created_at),
       lineItems: {
-        create: o.line_items.map((li) => ({
+        create: lineItems.map((li) => ({
           title: formatLineItemTitle(li),
-          sku: li.sku,
-          quantity: li.quantity,
+          sku: li.sku || null,
+          quantity: li.quantity || 1,
           price: num(li.price),
           productId: li.product_id ? String(li.product_id) : null,
         })),
@@ -167,10 +168,10 @@ export async function upsertOrder(o: ShopifyOrder): Promise<void> {
       ...(trackingId ? { trackingId, trackingUrl } : {}),
       lineItems: {
         deleteMany: {},
-        create: o.line_items.map((li) => ({
+        create: lineItems.map((li) => ({
           title: formatLineItemTitle(li),
-          sku: li.sku,
-          quantity: li.quantity,
+          sku: li.sku || null,
+          quantity: li.quantity || 1,
           price: num(li.price),
           productId: li.product_id ? String(li.product_id) : null,
         })),
