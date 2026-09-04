@@ -402,16 +402,22 @@ export default function OrdersPage() {
     setSyncing(true);
     setSyncMsg(null);
     try {
-      const res = await fetch("/api/shopify/sync", { method: "POST" });
-      const j = await res.json();
-      if (j.ok) {
-        setSyncMsg(`✅ ${j.orders} orders · ${j.products} products sync ho gaye`);
+      const res = await fetch("/api/shopify/sync?days=14", { method: "POST" });
+      const text = await res.text().catch(() => "");
+      let j: any = null;
+      try {
+        j = text ? JSON.parse(text) : null;
+      } catch {}
+
+      if (res.ok && j?.ok) {
+        setSyncMsg(`✅ ${j.orders} orders sync ho gaye`);
         await load();
       } else {
-        setSyncMsg(`❌ ${String(j.error).slice(0, 100)}`);
+        const errMsg = j?.error || (res.status === 504 ? "Server timeout (syncing in background)" : `Sync error (${res.status})`);
+        setSyncMsg(`❌ ${String(errMsg).slice(0, 100)}`);
       }
-    } catch (e) {
-      setSyncMsg(`❌ ${String(e)}`);
+    } catch (e: any) {
+      setSyncMsg(`❌ ${String(e?.message || e).slice(0, 100)}`);
     }
     setSyncing(false);
   }
@@ -425,8 +431,13 @@ export default function OrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ forceAll }),
       });
-      const j = await res.json();
-      if (j.ok) {
+      const text = await res.text().catch(() => "");
+      let j: any = null;
+      try {
+        j = text ? JSON.parse(text) : null;
+      } catch {}
+
+      if (res.ok && j?.ok) {
         setPostexSyncMsg({
           checked: j.checked,
           updated: j.updated,
@@ -437,10 +448,11 @@ export default function OrdersPage() {
         });
         await load();
       } else {
-        setSyncMsg(`❌ PostEx: ${String(j.error).slice(0, 100)}`);
+        const errMsg = j?.error || `PostEx error (${res.status})`;
+        setSyncMsg(`❌ PostEx: ${String(errMsg).slice(0, 100)}`);
       }
-    } catch (e) {
-      setSyncMsg(`❌ PostEx Sync Error: ${String(e)}`);
+    } catch (e: any) {
+      setSyncMsg(`❌ PostEx Sync Error: ${String(e?.message || e).slice(0, 100)}`);
     }
     setPostexSyncing(false);
   }
@@ -451,15 +463,20 @@ export default function OrdersPage() {
       const res = await fetch(`/api/postex/sync?orderId=${encodeURIComponent(orderId)}`, {
         method: "POST",
       });
-      const j = await res.json();
-      if (j.ok && j.order) {
+      const text = await res.text().catch(() => "");
+      let j: any = null;
+      try {
+        j = text ? JSON.parse(text) : null;
+      } catch {}
+
+      if (res.ok && j?.ok && j.order) {
         setEdit(j.order);
         await load();
       } else {
-        alert(`PostEx Sync Failed: ${j.error || "Unknown error"}`);
+        alert(`PostEx Sync Failed: ${j?.error || `Server returned ${res.status}`}`);
       }
-    } catch (e) {
-      alert(`Error syncing PostEx: ${String(e)}`);
+    } catch (e: any) {
+      alert(`Error syncing PostEx: ${String(e?.message || e)}`);
     }
     setSinglePostexSyncing(false);
   }
@@ -473,8 +490,13 @@ export default function OrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ forceAll }),
       });
-      const j = await res.json();
-      if (j.ok) {
+      const text = await res.text().catch(() => "");
+      let j: any = null;
+      try {
+        j = text ? JSON.parse(text) : null;
+      } catch {}
+
+      if (res.ok && j?.ok) {
         setRcSyncMsg({
           checked: j.checked,
           updated: j.updated,
@@ -485,10 +507,11 @@ export default function OrdersPage() {
         });
         await load();
       } else {
-        setSyncMsg(`❌ Run Courier: ${String(j.error).slice(0, 100)}`);
+        const errMsg = j?.error || `Run Courier error (${res.status})`;
+        setSyncMsg(`❌ Run Courier: ${String(errMsg).slice(0, 100)}`);
       }
-    } catch (e) {
-      setSyncMsg(`❌ Run Courier Sync Error: ${String(e)}`);
+    } catch (e: any) {
+      setSyncMsg(`❌ Run Courier Sync Error: ${String(e?.message || e).slice(0, 100)}`);
     }
     setRcSyncing(false);
   }
@@ -499,15 +522,20 @@ export default function OrdersPage() {
       const res = await fetch(`/api/runcourier/sync?orderId=${encodeURIComponent(orderId)}`, {
         method: "POST",
       });
-      const j = await res.json();
-      if (j.ok && j.order) {
+      const text = await res.text().catch(() => "");
+      let j: any = null;
+      try {
+        j = text ? JSON.parse(text) : null;
+      } catch {}
+
+      if (res.ok && j?.ok && j.order) {
         setEdit(j.order);
         await load();
       } else {
-        alert(`Run Courier Sync Failed: ${j.error || "Unknown error"}`);
+        alert(`Run Courier Sync Failed: ${j?.error || `Server returned ${res.status}`}`);
       }
-    } catch (e) {
-      alert(`Error syncing Run Courier: ${String(e)}`);
+    } catch (e: any) {
+      alert(`Error syncing Run Courier: ${String(e?.message || e)}`);
     }
     setSingleRcSyncing(false);
   }
