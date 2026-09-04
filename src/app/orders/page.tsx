@@ -14,6 +14,8 @@ import {
   BarChart3,
   AlertTriangle,
   XCircle,
+  AlertCircle,
+  Ban,
   Printer,
   Check,
   Calendar,
@@ -125,14 +127,31 @@ const DELIVERY_STATUSES = [
   "pending",
   "in transit",
   "out for delivery",
-  "delivered",
+  "attempt",
   "delivery attempt",
+  "delivered",
   "under review",
   "return initiated",
   "return in transit",
   "return out for delivery",
   "returned",
+  "cancel",
   "cancelled",
+];
+
+const DELIVERY_STATUS_OPTIONS = [
+  { value: "pending under ATC", label: "Pending under ATC" },
+  { value: "pending", label: "Pending" },
+  { value: "in transit", label: "In Transit" },
+  { value: "out for delivery", label: "Out for Delivery" },
+  { value: "delivery attempt", label: "Attempt" },
+  { value: "delivered", label: "Delivered" },
+  { value: "under review", label: "Under Review" },
+  { value: "return initiated", label: "Return Initiated" },
+  { value: "return in transit", label: "Return in Transit" },
+  { value: "return out for delivery", label: "Return Out for Delivery" },
+  { value: "returned", label: "Returned" },
+  { value: "cancelled", label: "Cancel" },
 ];
 
 function formatTimeAgo(dateStr?: string | null): string {
@@ -287,7 +306,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState<"active" | "courierHanded" | "delivered" | "rto" | "archive">("active");
+  const [tab, setTab] = useState<"active" | "courierHanded" | "attempt" | "delivered" | "rto" | "cancelled">("active");
   const [courierFilter, setCourierFilter] = useState<CourierSubFilter>("all");
   const [rtoCourierFilter, setRtoCourierFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
@@ -558,6 +577,8 @@ export default function OrdersPage() {
       deliveryStatus: edit.deliveryStatus || "pending under ATC",
       isPacked: edit.isPacked,
       isCourierHanded: edit.isCourierHanded,
+      archived: edit.archived,
+      cancelled: edit.cancelled,
     });
     setEdit(null);
     await load();
@@ -573,7 +594,7 @@ export default function OrdersPage() {
   }
 
   async function setArchived(id: string, archived: boolean) {
-    await apiSend("/api/orders", "PATCH", { id, archived });
+    await apiSend("/api/orders", "PATCH", { id, archived, cancelled: archived });
     await load();
   }
 
@@ -582,35 +603,58 @@ export default function OrdersPage() {
     load();
   }
 
-  // === 4-Section Filter Logic ===
-  // Archive: cancelled, voided, or manually archived
-  const isArchived = (o: Order) =>
-    o.archived || o.cancelled || o.stage === "cancelled" || o.financialStatus === "voided";
+  // === 5-Section Filter Logic (Active, Courier, Attempt, Delivered, Cancelled) ===
+  // Cancelled: cancelled in Shopify/manual, voided, manually archived, or status is cancel/cancelled
+  const isCancelled = (o: Order) =>
+    o.cancelled ||
+    o.archived ||
+    o.stage === "cancelled" ||
+    o.financialStatus === "voided" ||
+    o.deliveryStatus?.toLowerCase() === "cancelled" ||
+    o.deliveryStatus?.toLowerCase() === "cancel";
 
   // Delivered: manually marked completed/delivered, or courier status is delivered
   const isDelivered = (o: Order) =>
-    !isArchived(o) && (o.stage === "completed" || o.deliveryStatus?.toLowerCase() === "delivered");
+    !isCancelled(o) &&
+    (o.stage === "completed" ||
+      o.deliveryStatus?.toLowerCase() === "delivered" ||
+      o.courierStatus?.toLowerCase() === "delivered" ||
+      o.courierStatusCode === "0005");
 
-  // Courier Handed: isCourierHanded === true (dispatched), or courier tracking shows in transit/out for delivery/attempt/return
+  // Attempt: delivery attempt made / failed attempt (from manual edit or courier webhook)
+  const isAttempt = (o: Order) =>
+    !isCancelled(o) &&
+    !isDelivered(o) &&
+    (o.deliveryStatus?.toLowerCase() === "attempt" ||
+      o.deliveryStatus?.toLowerCase() === "delivery attempt" ||
+      o.deliveryStatus?.toLowerCase().includes("attempt") ||
+      o.courierStatus?.toLowerCase().includes("attempt") ||
+      o.courierStatusCode === "0013");
+
+  // Courier Handed: isCourierHanded === true (dispatched), or courier tracking shows in transit/out for delivery/return
   const isCourierHanded = (o: Order) =>
-    !isArchived(o) && !isDelivered(o) && (
-      !!o.isCourierHanded ||
+    !isCancelled(o) &&
+    !isDelivered(o) &&
+    !isAttempt(o) &&
+    (!!o.isCourierHanded ||
       o.deliveryStatus?.toLowerCase() === "in transit" ||
       o.deliveryStatus?.toLowerCase() === "out for delivery" ||
-      o.deliveryStatus?.toLowerCase() === "delivery attempt" ||
-      o.deliveryStatus?.toLowerCase().includes("return")
-    );
+      o.deliveryStatus?.toLowerCase().includes("return") ||
+      o.deliveryStatus?.toLowerCase() === "under review");
 
-  // Active: everything else (not courier handed, not delivered, not archived)
+  // Active: everything else (not courier handed, not delivered, not attempt, not cancelled)
   const isActive = (o: Order) =>
-    !isArchived(o) && !isDelivered(o) && !isCourierHanded(o);
+    !isCancelled(o) && !isDelivered(o) && !isAttempt(o) && !isCourierHanded(o);
 
   const getOrderSection = (o: Order): { key: string; label: string; icon: ReactNode; badgeStyle: string } => {
-    if (isArchived(o)) {
-      return { key: "archive", label: "Archive", icon: <Package className="w-3.5 h-3.5" />, badgeStyle: "bg-shade-30 text-shade-60 border border-shade-30" };
+    if (isCancelled(o)) {
+      return { key: "cancelled", label: "Cancelled", icon: <Ban className="w-3.5 h-3.5" />, badgeStyle: "bg-red-500/10 text-red-400 border border-red-500/20" };
     }
     if (isDelivered(o)) {
       return { key: "delivered", label: "Delivered", icon: <CheckCircle2 className="w-3.5 h-3.5" />, badgeStyle: "bg-aloe text-black border border-aloe" };
+    }
+    if (isAttempt(o)) {
+      return { key: "attempt", label: "Attempt", icon: <AlertCircle className="w-3.5 h-3.5" />, badgeStyle: "bg-amber-500/15 text-amber-300 border border-amber-500/30" };
     }
     if (isCourierHanded(o)) {
       return { key: "courierHanded", label: "Courier Handed", icon: <Truck className="w-3.5 h-3.5" />, badgeStyle: "bg-pistachio text-black border border-pistachio" };
@@ -660,9 +704,10 @@ export default function OrdersPage() {
 
   const activeOrders = orders.filter(isActive);
   const courierHandedOrders = orders.filter(isCourierHanded);
+  const attemptOrders = orders.filter(isAttempt);
   const deliveredOrders = orders.filter(isDelivered);
   const rtoOrders = orders.filter(isRtoOrder);
-  const archivedOrders = orders.filter(isArchived);
+  const cancelledOrders = orders.filter(isCancelled);
 
   // All orders filtered by selected date preset / custom range
   const dateFilteredOrders = orders.filter((o) =>
@@ -697,7 +742,7 @@ export default function OrdersPage() {
     .filter((c) => c.rtoCount > 0 || c.total > 0)
     .sort((a, b) => b.rtoCount - a.rtoCount);
 
-  const totalDispatched = dateFilteredOrders.filter((o) => o.isCourierHanded || isDelivered(o) || isRtoOrder(o)).length || dateFilteredOrders.length;
+  const totalDispatched = dateFilteredOrders.filter((o) => o.isCourierHanded || isDelivered(o) || isRtoOrder(o) || isAttempt(o)).length || dateFilteredOrders.length;
   const overallRtoRate = totalDispatched > 0 ? ((rtoDateFiltered.length / totalDispatched) * 100).toFixed(1) : "0";
   const rtoTotalValue = rtoDateFiltered.reduce((sum, o) => sum + o.totalPrice, 0);
   const topRtoCourier = courierRtoStats.find((c) => c.rtoCount > 0);
@@ -709,13 +754,14 @@ export default function OrdersPage() {
     : dateFilteredOrders.filter((o) => {
         if (tab === "active") return isActive(o);
         if (tab === "courierHanded") return isCourierHanded(o) && matchesCourierFilter(o, courierFilter);
+        if (tab === "attempt") return isAttempt(o);
         if (tab === "delivered") return isDelivered(o);
         if (tab === "rto") {
           if (!isRtoOrder(o)) return false;
           if (rtoCourierFilter === "all") return true;
           return getOrderCourierGroup(o) === rtoCourierFilter;
         }
-        return isArchived(o);
+        return isCancelled(o);
       });
 
   // Dynamic KPI Cards per tab state or global search
@@ -727,7 +773,7 @@ export default function OrdersPage() {
       const deliveredCount = shown.filter(isDelivered).length;
       const deliveredVal = shown.filter(isDelivered).reduce((sum, o) => sum + o.totalPrice, 0);
 
-      const activeOrHanded = shown.filter((o) => !isDelivered(o) && !isArchived(o));
+      const activeOrHanded = shown.filter((o) => !isDelivered(o) && !isCancelled(o));
       const activeHandedCount = activeOrHanded.length;
       const activeHandedVal = activeOrHanded.reduce((sum, o) => sum + o.totalPrice, 0);
 
@@ -840,20 +886,35 @@ export default function OrdersPage() {
       );
     }
 
-    // Archive tab
+    if (tab === "attempt") {
+      const totalCount = shown.length;
+      const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
+      const postexAttempts = shown.filter((o) => o.courierProvider === "postex" || o.courier?.toLowerCase() === "postex").length;
+      const otherAttempts = totalCount - postexAttempts;
+
+      return (
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <StatCard label="Total Attempts" value={String(totalCount)} sub="Orders with delivery attempt" icon={<AlertCircle className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Attempt Order Value" value={fmtPKR(totalSales)} sub="Value requiring follow-up" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="PostEx Attempts" value={String(postexAttempts)} sub="PostEx couriers" icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
+          <StatCard label="Other Couriers" value={String(otherAttempts)} sub="Manual & other attempts" icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
+        </div>
+      );
+    }
+
+    // Cancelled tab
     const totalCount = shown.length;
     const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
 
-    const returnedOrCancelled = shown.filter((o) => o.cancelled || o.deliveryStatus === "returned" || o.deliveryStatus === "cancelled" || o.stage === "cancelled");
-    const retCancelCount = returnedOrCancelled.length;
-    const lostVal = returnedOrCancelled.reduce((sum, o) => sum + o.totalPrice, 0);
+    const manualCancelled = shown.filter((o) => o.source === "manual").length;
+    const shopifyCancelled = totalCount - manualCancelled;
 
     return (
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Archived Orders" value={String(totalCount)} sub="Archived orders" icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
-        <StatCard label="Archived Sales Value" value={fmtPKR(totalSales)} sub="Total value archived" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
-        <StatCard label="Returned / Cancelled" value={String(retCancelCount)} sub="Cancelled/returned count" icon={<AlertTriangle className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
-        <StatCard label="Total Lost Value" value={fmtPKR(lostVal)} sub="Lost order value" icon={<XCircle className="w-5 h-5 stroke-[1.75]" />} tone="bad" />
+        <StatCard label="Total Cancelled" value={String(totalCount)} sub="All cancel orders" icon={<Ban className="w-5 h-5 stroke-[1.75]" />} tone="bad" />
+        <StatCard label="Cancelled Order Value" value={fmtPKR(totalSales)} sub="Lost sales revenue" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="bad" />
+        <StatCard label="Shopify Cancelled" value={String(shopifyCancelled)} sub="From Shopify store" icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+        <StatCard label="Manual Cancelled" value={String(manualCancelled)} sub="Directly marked cancel" icon={<XCircle className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
       </div>
     );
   };
@@ -1104,9 +1165,10 @@ export default function OrdersPage() {
           {([
             { k: "active" as const, l: `Active (${activeOrders.length})`, icon: ShoppingCart },
             { k: "courierHanded" as const, l: `Courier (${courierHandedOrders.length})`, icon: Truck },
+            { k: "attempt" as const, l: `Attempt (${attemptOrders.length})`, icon: AlertCircle },
             { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: CheckCircle2 },
             { k: "rto" as const, l: `RTO Calculation (${rtoDateFiltered.length})`, icon: RotateCcw },
-            { k: "archive" as const, l: `Archive (${archivedOrders.length})`, icon: Package },
+            { k: "cancelled" as const, l: `Cancelled (${cancelledOrders.length})`, icon: Ban },
           ]).map((t) => {
             const Icon = t.icon;
             return (
@@ -1188,9 +1250,10 @@ export default function OrdersPage() {
         title={
           tab === "active" ? "Active Orders" :
           tab === "courierHanded" ? (courierFilter === "all" ? "Courier Handed Orders" : `Courier Handed — ${courierFilter === "attempt" ? "Delivery Attempt" : courierFilter === "return" ? "Return" : courierFilter.charAt(0).toUpperCase() + courierFilter.slice(1)}`) :
+          tab === "attempt" ? `Attempt Orders (${shown.length})` :
           tab === "delivered" ? "Delivered Orders" :
           tab === "rto" ? (rtoCourierFilter === "all" ? `RTO Orders — All Couriers (${shown.length})` : `RTO Orders — ${rtoCourierFilter} (${shown.length})`) :
-          "Archived Orders"
+          "Cancelled Orders"
         }
         action={
           <div className="flex items-center gap-2">
@@ -1270,14 +1333,15 @@ export default function OrdersPage() {
             loading
               ? "Orders load ho rahe hain…"
               : q
-              ? `No orders found matching "${q}" in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : tab === "rto" ? "RTO Calculation" : "Archive"}.`
+              ? `No orders found matching "${q}" in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "attempt" ? "Attempt" : tab === "delivered" ? "Delivered" : tab === "rto" ? "RTO Calculation" : "Cancelled"}.`
               : datePreset !== "all"
-              ? `No orders found for selected date filter in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "delivered" ? "Delivered" : tab === "rto" ? "RTO Calculation" : "Archive"}.`
+              ? `No orders found for selected date filter in ${tab === "active" ? "Active" : tab === "courierHanded" ? "Courier Handed" : tab === "attempt" ? "Attempt" : tab === "delivered" ? "Delivered" : tab === "rto" ? "RTO Calculation" : "Cancelled"}.`
               : tab === "active" ? "No active orders found." :
                 tab === "courierHanded" ? "No courier handed orders found." :
+                tab === "attempt" ? "No attempt orders found." :
                 tab === "delivered" ? "No delivered orders found." :
                 tab === "rto" ? (rtoCourierFilter === "all" ? "No RTO orders found for selected criteria." : `No RTO orders found for ${rtoCourierFilter}.`) :
-                "No archived orders found."
+                "No cancelled orders found."
           } />
         ) : (
           <div className="overflow-x-auto">
@@ -1518,13 +1582,29 @@ export default function OrdersPage() {
                       <td className="py-2.5 px-2">
                         <div className="flex flex-col gap-1">
                           <select
-                            value={o.deliveryStatus || "pending under ATC"}
-                            onChange={(e) => updateField(o.id, { deliveryStatus: e.target.value })}
+                            value={
+                              isCancelled(o)
+                                ? "cancelled"
+                                : isAttempt(o)
+                                ? "delivery attempt"
+                                : o.deliveryStatus || "pending under ATC"
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const isCancelling = val === "cancelled" || val === "cancel";
+                              const isAtt = val === "attempt" || val === "delivery attempt";
+                              updateField(o.id, {
+                                deliveryStatus: isAtt ? "delivery attempt" : val,
+                                cancelled: isCancelling,
+                                archived: isCancelling,
+                                isCourierHanded: isAtt ? true : o.isCourierHanded,
+                              });
+                            }}
                             className="bg-panel2 text-xs text-text border border-border rounded-shopify-sm px-1.5 py-1 focus:outline-none focus:border-text cursor-pointer capitalize"
                           >
-                            {DELIVERY_STATUSES.map((st) => (
-                              <option key={st} value={st}>
-                                {st}
+                            {DELIVERY_STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
                               </option>
                             ))}
                           </select>
@@ -1536,7 +1616,7 @@ export default function OrdersPage() {
                         </div>
                       </td>
 
-                      {/* 15 & 16. Actions: View & Archive/Restore */}
+                      {/* 15 & 16. Actions: View & Cancel/Restore */}
                       <td className="py-2.5 px-2 text-right whitespace-nowrap">
                         <button
                           type="button"
@@ -1545,18 +1625,23 @@ export default function OrdersPage() {
                         >
                           <span>View</span>
                         </button>
-                        {!isArchived(o) ? (
+                        {!isCancelled(o) ? (
                           <button
-                            className="text-muted hover:text-text hover:underline text-xs"
-                            onClick={() => setArchived(o.id, true)}
-                            title="Archive kar do"
+                            className="text-muted hover:text-bad hover:underline text-xs"
+                            onClick={() => {
+                              updateField(o.id, { cancelled: true, archived: true, deliveryStatus: "cancelled" });
+                            }}
+                            title="Cancel this order"
                           >
-                            Archive
+                            Cancel
                           </button>
                         ) : (
                           <button
                             className="text-brand-light hover:underline text-xs"
-                            onClick={() => setArchived(o.id, false)}
+                            onClick={() => {
+                              updateField(o.id, { cancelled: false, archived: false, deliveryStatus: "pending under ATC" });
+                            }}
+                            title="Restore this order"
                           >
                             Restore
                           </button>
@@ -1671,9 +1756,30 @@ export default function OrdersPage() {
               </div>
               <div>
                 <label className="label">Delivery Status</label>
-                <select className="input" value={edit.deliveryStatus || "pending under ATC"} onChange={(e) => setEdit({ ...edit, deliveryStatus: e.target.value })}>
-                  {DELIVERY_STATUSES.map((st) => (
-                    <option key={st} value={st}>{st}</option>
+                <select
+                  className="input"
+                  value={
+                    edit.cancelled || edit.deliveryStatus === "cancelled" || edit.deliveryStatus === "cancel"
+                      ? "cancelled"
+                      : edit.deliveryStatus?.toLowerCase() === "attempt" || edit.deliveryStatus?.toLowerCase() === "delivery attempt"
+                      ? "delivery attempt"
+                      : edit.deliveryStatus || "pending under ATC"
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const isCancelling = val === "cancelled" || val === "cancel";
+                    const isAtt = val === "attempt" || val === "delivery attempt";
+                    setEdit({
+                      ...edit,
+                      deliveryStatus: isAtt ? "delivery attempt" : val,
+                      cancelled: isCancelling,
+                      archived: isCancelling,
+                      isCourierHanded: isAtt ? true : edit.isCourierHanded,
+                    });
+                  }}
+                >
+                  {DELIVERY_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>

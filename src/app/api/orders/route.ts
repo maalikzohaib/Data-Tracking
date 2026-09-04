@@ -208,6 +208,7 @@ const patchSchema = z.object({
   deliveryStatus: z.string().optional(),
   labelColor: z.string().optional(),
   archived: z.boolean().optional(),
+  cancelled: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request) {
@@ -241,6 +242,7 @@ export async function PATCH(req: Request) {
     deliveryStatus,
     labelColor,
     archived,
+    cancelled,
   } = parsed.data;
 
   const stageData = stage
@@ -251,10 +253,41 @@ export async function PATCH(req: Request) {
       }
     : {};
 
+  let extraDeliveryData: any = {};
+  if (deliveryStatus !== undefined) {
+    const dsLower = deliveryStatus.toLowerCase();
+    if (dsLower === "cancelled" || dsLower === "cancel") {
+      extraDeliveryData = {
+        deliveryStatus: "cancelled",
+        cancelled: true,
+        archived: true,
+      };
+    } else if (dsLower === "attempt" || dsLower === "delivery attempt") {
+      extraDeliveryData = {
+        deliveryStatus: "delivery attempt",
+        isCourierHanded: true,
+        cancelled: false,
+        archived: false,
+      };
+    } else if (dsLower === "delivered") {
+      extraDeliveryData = {
+        deliveryStatus: "delivered",
+        isCourierHanded: true,
+        cancelled: false,
+        archived: false,
+      };
+    } else {
+      extraDeliveryData = {
+        deliveryStatus,
+      };
+    }
+  }
+
   const order = await prisma.order.update({
     where: { id },
     data: {
       ...stageData,
+      ...extraDeliveryData,
       ...(customerName !== undefined ? { customerName } : {}),
       ...(customerPhone !== undefined ? { customerPhone } : {}),
       ...(customerCity !== undefined ? { customerCity } : {}),
@@ -274,9 +307,9 @@ export async function PATCH(req: Request) {
       ...(isCourierHanded !== undefined ? { isCourierHanded } : {}),
       ...(remarks !== undefined ? { remarks } : {}),
       ...(specialDetails !== undefined ? { specialDetails } : {}),
-      ...(deliveryStatus !== undefined ? { deliveryStatus } : {}),
       ...(labelColor !== undefined ? { labelColor } : {}),
       ...(archived !== undefined ? { archived } : {}),
+      ...(cancelled !== undefined ? { cancelled } : {}),
     },
   });
 

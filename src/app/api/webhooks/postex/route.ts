@@ -54,20 +54,39 @@ export async function POST(req: Request) {
         item.trackingNo ||
         item.tracking_number ||
         item.trackingId ||
-        item.orderRefNumber ||
         ""
       ).trim();
 
-      if (!trackingNumber) continue;
+      const orderRef = String(
+        item.orderRefNumber ||
+        item.orderRef ||
+        item.orderNumber ||
+        item.order_number ||
+        item.invoiceId ||
+        item.reference ||
+        ""
+      ).trim();
 
-      // Find matching order in DB by trackingId or orderRef
+      if (!trackingNumber && !orderRef) continue;
+
+      const orderRefClean = orderRef.replace(/^#/, "");
+      const orderRefHash = orderRef ? (orderRef.startsWith("#") ? orderRef : `#${orderRef}`) : "";
+
+      const orFilters: any[] = [];
+      if (trackingNumber) {
+        orFilters.push({ trackingId: { equals: trackingNumber, mode: "insensitive" } });
+        orFilters.push({ orderNumber: { equals: trackingNumber, mode: "insensitive" } });
+      }
+      if (orderRef) {
+        orFilters.push({ orderNumber: { equals: orderRef, mode: "insensitive" } });
+        orFilters.push({ orderNumber: { equals: orderRefHash, mode: "insensitive" } });
+        orFilters.push({ orderNumber: { equals: orderRefClean, mode: "insensitive" } });
+        orFilters.push({ shopifyId: { equals: orderRefClean } });
+      }
+
+      // Find matching order in DB by trackingId, orderNumber, or shopifyId
       const order = await prisma.order.findFirst({
-        where: {
-          OR: [
-            { trackingId: { equals: trackingNumber, mode: "insensitive" } },
-            { orderNumber: { equals: trackingNumber, mode: "insensitive" } },
-          ],
-        },
+        where: { OR: orFilters },
       });
 
       if (!order) continue;
@@ -75,7 +94,7 @@ export async function POST(req: Request) {
       // Normalize status
       const trackData: PostexTrackData = {
         trackingNumber: order.trackingId || trackingNumber,
-        orderRefNumber: item.orderRefNumber || item.orderRef || order.orderNumber,
+        orderRefNumber: orderRef || order.orderNumber,
         transactionStatus: item.transactionStatus || item.status || item.orderStatus,
         transactionStatusCode: item.transactionStatusCode || item.statusCode || item.orderStatusCode,
         orderStatus: item.orderStatus || item.status,
@@ -84,10 +103,11 @@ export async function POST(req: Request) {
       };
 
       const normalized = normalizePostexStatus(trackData, config.statusMapping);
+      const lowerInternal = normalized.internalStatus.toLowerCase();
       const mappedDeliveryStatus =
-        normalized.internalStatus.toLowerCase() === "pending"
+        lowerInternal === "pending"
           ? (order.deliveryStatus || "pending under ATC")
-          : normalized.internalStatus.toLowerCase();
+          : lowerInternal;
 
       const isStatusChanged =
         order.deliveryStatus?.toLowerCase() !== mappedDeliveryStatus ||
@@ -104,6 +124,25 @@ export async function POST(req: Request) {
         courierSyncError: null,
         rawCourierResponse: item as any,
       };
+
+      // Handle Cancelled status automatically
+      if (mappedDeliveryStatus === "cancelled" || mappedDeliveryStatus === "cancel" || normalized.courierStatusCode === "0009") {
+        updateData.cancelled = true;
+        updateData.archived = true;
+        updateData.deliveryStatus = "cancelled";
+      }
+
+      // Handle Attempt status automatically
+      if (mappedDeliveryStatus.includes("attempt") || normalized.courierStatusCode === "0013") {
+        updateData.deliveryStatus = "delivery attempt";
+        updateData.isCourierHanded = true;
+      }
+
+      // Handle Delivered status automatically
+      if (mappedDeliveryStatus === "delivered" || normalized.courierStatusCode === "0005") {
+        updateData.deliveryStatus = "delivered";
+        updateData.isCourierHanded = true;
+      }
 
       if (trackData.trackingNumber && trackData.trackingNumber !== order.trackingId) {
         updateData.trackingId = trackData.trackingNumber;
@@ -133,11 +172,23 @@ export async function POST(req: Request) {
         data: updateData,
       });
 
+      // Record SyncLog for visible audit trail in Settings > Sync Logs
+      const orderLabel = order.orderNumber?.startsWith("#") ? order.orderNumber : `#${order.orderNumber || order.id}`;
+      await prisma.syncLog.create({
+        data: {
+          source: "postex-webhook",
+          status: "success",
+          count: 1,
+          message: `${normalized.courierStatus} [${normalized.courierStatusCode || ""}] — ${orderLabel} (${order.customerName || "Customer"})`,
+        },
+      }).catch(() => {});
+
       processedCount++;
     }
 
     if (processedCount > 0) {
       broadcastEvent("postex:sync", { processed: processedCount });
+      broadcastEvent("order:updated", { count: processedCount });
     }
 
     return NextResponse.json({

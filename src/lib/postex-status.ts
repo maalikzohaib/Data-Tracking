@@ -12,7 +12,7 @@ export const DEFAULT_POSTEX_CODE_MAP: Record<string, string> = {
   "0006": "Return in Transit",     // Return In-Transit
   "0007": "Return in Transit",     // Return Received at Warehouse
   "0008": "Under Review",          // Delivery Under Review
-  "0009": "Pending",               // Order Cancelled by Merchant
+  "0009": "Cancelled",             // Order Cancelled by Merchant
   "0010": "In Transit",            // Dispatched to Destination
   "0011": "In Transit",            // Received at Destination
   "0012": "Out for Delivery",       // Out for Delivery
@@ -174,6 +174,17 @@ export function normalizePostexStatus(
       internalStatus: "In Transit",
       courierStatus: rawStatus,
       courierStatusCode: code || "0003",
+      isReturnJourney: false,
+      history,
+      raw: trackData,
+    };
+  }
+
+  if (lowerStatus.includes("cancel")) {
+    return {
+      internalStatus: "Cancelled",
+      courierStatus: rawStatus,
+      courierStatusCode: code || "0009",
       isReturnJourney: false,
       history,
       raw: trackData,
