@@ -26,9 +26,12 @@ export function verifyShopifyWebhook(
     .update(rawBody, "utf8")
     .digest("base64");
   try {
+    const a = Buffer.from(digest);
+    const b = Buffer.from(hmacHeader);
+    if (a.length !== b.length) return false;
     return crypto.timingSafeEqual(
-      Buffer.from(digest),
-      Buffer.from(hmacHeader)
+      new Uint8Array(a) as any,
+      new Uint8Array(b) as any
     );
   } catch {
     return false;
