@@ -153,6 +153,30 @@ export async function syncPostexOrders(options: SyncOptions = {}): Promise<Poste
         rawCourierResponse: trackData as any,
       };
 
+      // Handle Cancelled status automatically
+      if (
+        mappedDeliveryStatus === "cancelled" ||
+        mappedDeliveryStatus === "cancel" ||
+        normalized.courierStatusCode === "0002" ||
+        normalized.courierStatusCode === "0009"
+      ) {
+        updateData.cancelled = true;
+        updateData.archived = true;
+        updateData.deliveryStatus = "cancelled";
+      }
+
+      // Handle Attempt status automatically
+      if (mappedDeliveryStatus.includes("attempt") || normalized.courierStatusCode === "0013") {
+        updateData.deliveryStatus = "delivery attempt";
+        updateData.isCourierHanded = true;
+      }
+
+      // Handle Delivered status automatically
+      if (mappedDeliveryStatus === "delivered" || normalized.courierStatusCode === "0005") {
+        updateData.deliveryStatus = "delivered";
+        updateData.isCourierHanded = true;
+      }
+
       // Automatically link the retrieved PostEx tracking number
       if (trackData.trackingNumber && trackData.trackingNumber !== order.trackingId) {
         updateData.trackingId = trackData.trackingNumber;
@@ -262,6 +286,30 @@ export async function syncSinglePostexOrder(orderId: string): Promise<{
     courierSyncError: null,
     rawCourierResponse: trackData as any,
   };
+
+  // Handle Cancelled status automatically
+  if (
+    mappedDeliveryStatus === "cancelled" ||
+    mappedDeliveryStatus === "cancel" ||
+    normalized.courierStatusCode === "0002" ||
+    normalized.courierStatusCode === "0009"
+  ) {
+    updateData.cancelled = true;
+    updateData.archived = true;
+    updateData.deliveryStatus = "cancelled";
+  }
+
+  // Handle Attempt status automatically
+  if (mappedDeliveryStatus.includes("attempt") || normalized.courierStatusCode === "0013") {
+    updateData.deliveryStatus = "delivery attempt";
+    updateData.isCourierHanded = true;
+  }
+
+  // Handle Delivered status automatically
+  if (mappedDeliveryStatus === "delivered" || normalized.courierStatusCode === "0005") {
+    updateData.deliveryStatus = "delivered";
+    updateData.isCourierHanded = true;
+  }
 
   if (trackData.trackingNumber) {
     updateData.trackingId = trackData.trackingNumber;

@@ -5,7 +5,7 @@ import { PostexTrackData, PostexStatusHistoryItem } from "./postex";
  */
 export const DEFAULT_POSTEX_CODE_MAP: Record<string, string> = {
   "0001": "Pending",               // At Merchant's Warehouse / Booked
-  "0002": "Returned",              // Returned
+  "0002": "Cancelled",             // Un-Assigned By Me / Booking Cancelled
   "0003": "In Transit",            // At PostEx Warehouse
   "0004": "Out for Delivery",       // Package on Route
   "0005": "Delivered",             // Delivered
@@ -54,6 +54,23 @@ export function normalizePostexStatus(
     ? [...trackData.transactionStatusHistory]
     : [];
 
+  // Priority check: PostEx 0002 / Un-Assigned By Me is ALWAYS Cancelled
+  const lowerStatus = rawStatus.toLowerCase();
+  if (
+    code === "0002" ||
+    lowerStatus.includes("un-assigned") ||
+    lowerStatus.includes("unassigned")
+  ) {
+    return {
+      internalStatus: "Cancelled",
+      courierStatus: rawStatus,
+      courierStatusCode: code || "0002",
+      isReturnJourney: false,
+      history,
+      raw: trackData,
+    };
+  }
+
   // Check if custom mapping overrides this code
   if (customMapping && code && customMapping[code]) {
     return {
@@ -80,7 +97,6 @@ export function normalizePostexStatus(
   }
 
   // Fallback heuristic based on status text and history analysis
-  const lowerStatus = rawStatus.toLowerCase();
 
   // Return Journey Analysis
   if (lowerStatus.includes("return")) {
@@ -117,7 +133,7 @@ export function normalizePostexStatus(
     return {
       internalStatus: "Returned",
       courierStatus: rawStatus,
-      courierStatusCode: code || "0002",
+      courierStatusCode: code || "0016",
       isReturnJourney: true,
       history,
       raw: trackData,

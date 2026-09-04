@@ -269,6 +269,16 @@ function matchesCourierFilter(o: Order, filter: CourierSubFilter): boolean {
   }
 
   if (filter === "return") {
+    if (
+      o.cancelled ||
+      o.archived ||
+      o.courierStatusCode === "0002" ||
+      o.courierStatusCode === "0009" ||
+      cst.includes("un-assigned") ||
+      cst.includes("unassigned")
+    ) {
+      return false;
+    }
     return (
       st.includes("return") ||
       st.includes("returned") ||
@@ -632,14 +642,18 @@ export default function OrdersPage() {
   }
 
   // === 5-Section Filter Logic (Active, Courier, Attempt, Delivered, Cancelled) ===
-  // Cancelled: cancelled in Shopify/manual, voided, manually archived, or status is cancel/cancelled
+  // Cancelled: cancelled in Shopify/manual, voided, manually archived, or status is cancel/cancelled/un-assigned
   const isCancelled = (o: Order) =>
     o.cancelled ||
     o.archived ||
     o.stage === "cancelled" ||
     o.financialStatus === "voided" ||
     o.deliveryStatus?.toLowerCase() === "cancelled" ||
-    o.deliveryStatus?.toLowerCase() === "cancel";
+    o.deliveryStatus?.toLowerCase() === "cancel" ||
+    o.courierStatusCode === "0002" ||
+    o.courierStatusCode === "0009" ||
+    o.courierStatus?.toLowerCase().includes("un-assigned") ||
+    o.courierStatus?.toLowerCase().includes("unassigned");
 
   // Delivered: manually marked completed/delivered, or courier status is delivered
   const isDelivered = (o: Order) =>
@@ -700,8 +714,17 @@ export default function OrdersPage() {
     o.remarks?.toLowerCase().includes(q.toLowerCase());
 
   const isRtoOrder = (o: Order) => {
-    const ds = (o.deliveryStatus || "").toLowerCase();
+    if (isCancelled(o)) return false;
     const cs = (o.courierStatus || "").toLowerCase();
+    if (
+      cs.includes("un-assigned") ||
+      cs.includes("unassigned") ||
+      o.courierStatusCode === "0002" ||
+      o.courierStatusCode === "0009"
+    ) {
+      return false;
+    }
+    const ds = (o.deliveryStatus || "").toLowerCase();
     return (
       ds.includes("return") ||
       ds === "returned" ||

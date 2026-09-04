@@ -126,7 +126,12 @@ export async function POST(req: Request) {
       };
 
       // Handle Cancelled status automatically
-      if (mappedDeliveryStatus === "cancelled" || mappedDeliveryStatus === "cancel" || normalized.courierStatusCode === "0009") {
+      if (
+        mappedDeliveryStatus === "cancelled" ||
+        mappedDeliveryStatus === "cancel" ||
+        normalized.courierStatusCode === "0002" ||
+        normalized.courierStatusCode === "0009"
+      ) {
         updateData.cancelled = true;
         updateData.archived = true;
         updateData.deliveryStatus = "cancelled";

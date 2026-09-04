@@ -456,9 +456,11 @@ export default function SettingsPage() {
                     { code: "0005", meaning: "Delivered", default: "Delivered" },
                     { code: "0008", meaning: "Delivery Under Review", default: "Under Review" },
                     { code: "0013", meaning: "Attempt Made / Failed", default: "Delivery Attempt" },
-                    { code: "0002", meaning: "Returned to Origin", default: "Returned" },
+                    { code: "0002", meaning: "Un-Assigned / Cancelled", default: "Cancelled" },
+                    { code: "0009", meaning: "Cancelled by Merchant", default: "Cancelled" },
                     { code: "0006", meaning: "Return in Transit", default: "Return in Transit" },
                     { code: "0014", meaning: "Return Initiated", default: "Return Initiated" },
+                    { code: "0016", meaning: "Returned to Origin", default: "Returned" },
                   ].map((row) => (
                     <tr key={row.code} className="hover:bg-panel/40">
                       <td className="py-1.5 px-3 font-mono font-medium">{row.code}</td>
