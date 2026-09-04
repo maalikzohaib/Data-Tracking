@@ -826,7 +826,7 @@ export default function OrdersPage() {
         return isCancelled(o);
       });
 
-  // Dynamic KPI Cards per tab state or global search (All subsections display business RTO Return Ratio)
+  // Dynamic KPI Cards per tab state or global search
   const renderKpiCards = () => {
     if (q) {
       const totalCount = shown.length;
@@ -835,12 +835,16 @@ export default function OrdersPage() {
       const deliveredCount = shown.filter(isDelivered).length;
       const deliveredVal = shown.filter(isDelivered).reduce((sum, o) => sum + o.totalPrice, 0);
 
+      const activeOrHanded = shown.filter((o) => !isDelivered(o) && !isCancelled(o));
+      const activeHandedCount = activeOrHanded.length;
+      const activeHandedVal = activeOrHanded.reduce((sum, o) => sum + o.totalPrice, 0);
+
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatCard label="Global Matches" value={String(totalCount)} sub={`Search results for "${q}"`} icon={<Search className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
           <StatCard label="Total Match Value" value={fmtPKR(totalSales)} sub="Total value of results" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
           <StatCard label="Delivered Matched" value={String(deliveredCount)} sub={`Val: ${fmtPKR(deliveredVal)}`} icon={<CheckCircle2 className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
-          <StatCard label="Business RTO Ratio" value={`${overallRtoRate}%`} sub={`${rtoDateFiltered.length} returned of ${totalDispatched} dispatched`} icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Active / Handed" value={String(activeHandedCount)} sub={`Val: ${fmtPKR(activeHandedVal)}`} icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
         </div>
       );
     }
@@ -853,12 +857,16 @@ export default function OrdersPage() {
       const unconfirmedCount = unconfirmed.length;
       const unconfirmedVal = unconfirmed.reduce((sum, o) => sum + o.totalPrice, 0);
 
+      const pendingFulfill = shown.filter((o) => !o.isCourierHanded);
+      const pendingFulfillCount = pendingFulfill.length;
+      const pendingFulfillVal = pendingFulfill.reduce((sum, o) => sum + o.totalPrice, 0);
+
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatCard label="Total Active Orders" value={String(totalCount)} sub="Active orders" icon={<ShoppingCart className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
           <StatCard label="Active Sales" value={fmtPKR(totalSales)} sub="Total active value" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
           <StatCard label="Pending Confirmation" value={String(unconfirmedCount)} sub={`Val: ${fmtPKR(unconfirmedVal)}`} icon={<Clock className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
-          <StatCard label="Business RTO Ratio" value={`${overallRtoRate}%`} sub={`${rtoDateFiltered.length} returned of ${totalDispatched} dispatched`} icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Pending Fulfillment" value={String(pendingFulfillCount)} sub={`Val: ${fmtPKR(pendingFulfillVal)}`} icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
         </div>
       );
     }
@@ -879,7 +887,7 @@ export default function OrdersPage() {
           <StatCard label="Total Handed Orders" value={String(totalCount)} sub="With courier" icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
           <StatCard label="Handed Sales" value={fmtPKR(totalSales)} sub="Total handed value" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
           <StatCard label="COD Amount to Receive" value={fmtPKR(codVal)} sub={`${codOrders.length} COD orders`} icon={<Wallet className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
-          <StatCard label="Business RTO Ratio" value={`${overallRtoRate}%`} sub={`${rtoDateFiltered.length} returned of ${totalDispatched} dispatched`} icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Orders in Transit" value={String(inTransitCount)} sub={`Val: ${fmtPKR(inTransitVal)}`} icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
         </div>
       );
     }
@@ -889,13 +897,14 @@ export default function OrdersPage() {
       const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
 
       const codReceived = shown.filter((o) => (o.paymentMethod || "COD") === "COD").reduce((sum, o) => sum + o.totalPrice, 0);
+      const aov = totalCount > 0 ? totalSales / totalCount : 0;
 
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatCard label="Total Delivered Orders" value={String(totalCount)} sub="Delivered & completed" icon={<CheckCircle2 className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
           <StatCard label="Total Received Sales" value={fmtPKR(totalSales)} sub="Completed sales" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="good" />
           <StatCard label="Total COD Received" value={fmtPKR(codReceived)} sub="COD collected" icon={<Wallet className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
-          <StatCard label="Business RTO Ratio" value={`${overallRtoRate}%`} sub={`${rtoDateFiltered.length} returned of ${totalDispatched} dispatched`} icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Average Order Value" value={fmtPKR(aov)} sub="AOV per order" icon={<BarChart3 className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
         </div>
       );
     }
@@ -947,13 +956,14 @@ export default function OrdersPage() {
       const totalCount = shown.length;
       const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
       const postexAttempts = shown.filter((o) => o.courierProvider === "postex" || o.courier?.toLowerCase() === "postex").length;
+      const otherAttempts = totalCount - postexAttempts;
 
       return (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <StatCard label="Total Attempts" value={String(totalCount)} sub="Orders with delivery attempt" icon={<AlertCircle className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
           <StatCard label="Attempt Order Value" value={fmtPKR(totalSales)} sub="Value requiring follow-up" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
           <StatCard label="PostEx Attempts" value={String(postexAttempts)} sub="PostEx couriers" icon={<Truck className="w-5 h-5 stroke-[1.75]" />} tone="accent" />
-          <StatCard label="Business RTO Ratio" value={`${overallRtoRate}%`} sub={`${rtoDateFiltered.length} returned of ${totalDispatched} dispatched`} icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+          <StatCard label="Other Couriers" value={String(otherAttempts)} sub="Manual & other attempts" icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
         </div>
       );
     }
@@ -962,13 +972,14 @@ export default function OrdersPage() {
     const totalCount = shown.length;
     const totalSales = shown.reduce((sum, o) => sum + o.totalPrice, 0);
     const shopifyCancelled = shown.filter((o) => o.source === "shopify").length;
+    const manualCancelled = shown.filter((o) => o.source === "manual").length;
 
     return (
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total Cancelled" value={String(totalCount)} sub="All cancel orders" icon={<Ban className="w-5 h-5 stroke-[1.75]" />} tone="bad" />
         <StatCard label="Cancelled Order Value" value={fmtPKR(totalSales)} sub="Lost sales revenue" icon={<DollarSign className="w-5 h-5 stroke-[1.75]" />} tone="bad" />
         <StatCard label="Shopify Cancelled" value={String(shopifyCancelled)} sub="From Shopify store" icon={<Package className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
-        <StatCard label="Business RTO Ratio" value={`${overallRtoRate}%`} sub={`${rtoDateFiltered.length} returned of ${totalDispatched} dispatched`} icon={<RotateCcw className="w-5 h-5 stroke-[1.75]" />} tone="warn" />
+        <StatCard label="Manual Cancelled" value={String(manualCancelled)} sub="Directly marked cancel" icon={<XCircle className="w-5 h-5 stroke-[1.75]" />} tone="brand" />
       </div>
     );
   };
@@ -1213,34 +1224,28 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Persistent Business RTO Overview Banner (Visible across ALL Subsections, 100% borderless) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-panel2 px-4 py-2.5 rounded-shopify-lg mb-5 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-warn/15 flex items-center justify-center text-warn shrink-0">
-            <RotateCcw className="w-3.5 h-3.5" />
+      {/* Business RTO Overview Banner (Only shown in RTO Calculation section) */}
+      {tab === "rto" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-panel2 px-4 py-2.5 rounded-shopify-lg mb-5 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-warn/15 flex items-center justify-center text-warn shrink-0">
+              <RotateCcw className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="text-muted font-medium">All Orders Business RTO Ratio: </span>
+              <span className="font-bold text-sm text-warn ml-1">{overallRtoRate}%</span>
+              <span className="text-muted ml-2">
+                ({rtoDateFiltered.length} return{rtoDateFiltered.length === 1 ? "" : "s"} of {totalDispatched} dispatched shipments)
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="text-muted font-medium">All Orders Business RTO Ratio: </span>
-            <span className="font-bold text-sm text-warn ml-1">{overallRtoRate}%</span>
-            <span className="text-muted ml-2">
-              ({rtoDateFiltered.length} return{rtoDateFiltered.length === 1 ? "" : "s"} of {totalDispatched} dispatched shipments)
-            </span>
+          <div className="flex flex-wrap items-center gap-3 text-micro text-muted">
+            <span>PostEx: <strong className="text-text">{postexStat?.rtoCount || 0}</strong> ({postexRate}%)</span>
+            <span>Run Courier: <strong className="text-text">{rcStat?.rtoCount || 0}</strong> ({rcRate}%)</span>
+            <span>Leopard: <strong className="text-text">{leopardStat?.rtoCount || 0}</strong> ({leopardRate}%)</span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-micro text-muted">
-          <span>PostEx: <strong className="text-text">{postexStat?.rtoCount || 0}</strong> ({postexRate}%)</span>
-          <span>Run Courier: <strong className="text-text">{rcStat?.rtoCount || 0}</strong> ({rcRate}%)</span>
-          <span>Leopard: <strong className="text-text">{leopardStat?.rtoCount || 0}</strong> ({leopardRate}%)</span>
-          {tab !== "rto" && (
-            <button
-              onClick={() => setTab("rto")}
-              className="text-aloe font-medium hover:underline flex items-center gap-0.5 cursor-pointer ml-1"
-            >
-              View Returns →
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Section Tabs & Courier Sub-Filters (Borderless & clean) */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
@@ -1250,7 +1255,7 @@ export default function OrdersPage() {
             { k: "courierHanded" as const, l: `Courier (${courierHandedOrders.length})`, icon: Truck },
             { k: "attempt" as const, l: `Attempt (${attemptOrders.length})`, icon: AlertCircle },
             { k: "delivered" as const, l: `Delivered (${deliveredOrders.length})`, icon: CheckCircle2 },
-            { k: "rto" as const, l: `RTO Calculation (${rtoDateFiltered.length} · ${overallRtoRate}%)`, icon: RotateCcw },
+            { k: "rto" as const, l: `RTO Calculation (${rtoDateFiltered.length})`, icon: RotateCcw },
             { k: "cancelled" as const, l: `Cancelled (${cancelledOrders.length})`, icon: Ban },
           ]).map((t) => {
             const Icon = t.icon;
