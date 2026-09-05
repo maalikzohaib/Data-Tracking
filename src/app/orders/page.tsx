@@ -815,10 +815,21 @@ export default function OrdersPage() {
   const rtoOrders = orders.filter(isRtoOrder);
   const cancelledOrders = orders.filter(isCancelled);
 
-  // All orders filtered by selected date preset / custom range
-  const dateFilteredOrders = orders.filter((o) =>
-    isWithinDateRange(o.shopifyCreatedAt || (o as any).createdAt, datePreset, customFrom, customTo)
-  );
+  // All orders filtered by selected date preset / custom range:
+  // Matches if creation date OR latest courier status change date falls within range
+  const dateFilteredOrders = orders.filter((o) => {
+    if (datePreset === "all") return true;
+    if (isWithinDateRange(o.shopifyCreatedAt || (o as any).createdAt, datePreset, customFrom, customTo)) {
+      return true;
+    }
+    if (o.lastStatusChangeAt && isWithinDateRange(o.lastStatusChangeAt, datePreset, customFrom, customTo)) {
+      return true;
+    }
+    if (o.lastCourierSyncAt && isWithinDateRange(o.lastCourierSyncAt, datePreset, customFrom, customTo)) {
+      return true;
+    }
+    return false;
+  });
 
   const courierHandedDateFiltered = dateFilteredOrders.filter(isCourierHanded);
   const courierCountAll = courierHandedDateFiltered.length;
@@ -1129,12 +1140,12 @@ export default function OrdersPage() {
             <span>{syncing ? "Syncing…" : "Sync Shopify"}</span>
           </button>
 
-          <button className="btn-primary whitespace-nowrap text-xs py-1.5 !px-4 flex items-center gap-1.5" onClick={() => syncPostex(false)} disabled={postexSyncing}>
+          <button className="btn-primary whitespace-nowrap text-xs py-1.5 !px-4 flex items-center gap-1.5 cursor-pointer" onClick={() => syncPostex(true)} disabled={postexSyncing}>
             <Truck className={`w-3.5 h-3.5 ${postexSyncing ? "animate-bounce" : ""}`} />
             <span>{postexSyncing ? "Checking PostEx…" : "Sync PostEx"}</span>
           </button>
 
-          <button className="btn-primary whitespace-nowrap text-xs py-1.5 !px-4 flex items-center gap-1.5" onClick={() => syncRunCourier(false)} disabled={rcSyncing} style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+          <button className="btn-primary whitespace-nowrap text-xs py-1.5 !px-4 flex items-center gap-1.5 cursor-pointer" onClick={() => syncRunCourier(true)} disabled={rcSyncing} style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
             <Truck className={`w-3.5 h-3.5 ${rcSyncing ? "animate-bounce" : ""}`} />
             <span>{rcSyncing ? "Checking Run Courier…" : "Sync Run Courier"}</span>
           </button>

@@ -77,6 +77,7 @@ export async function syncPostexOrders(options: SyncOptions = {}): Promise<Poste
       courierStatusCode: true,
       stage: true,
     },
+    orderBy: { shopifyCreatedAt: "desc" },
     take: 300,
   });
 
@@ -93,11 +94,12 @@ export async function syncPostexOrders(options: SyncOptions = {}): Promise<Poste
     return result;
   }
 
-  // Collect all potential query keys (tracking ID and order numbers with/without #)
+  // Collect all potential query keys (prioritize valid tracking IDs to keep API payload optimal)
   const lookupKeys: string[] = [];
   for (const order of orders) {
-    if (order.trackingId) lookupKeys.push(order.trackingId.trim());
-    if (order.orderNumber) {
+    if (order.trackingId) {
+      lookupKeys.push(order.trackingId.trim());
+    } else if (order.orderNumber) {
       const cleanNum = order.orderNumber.replace("#", "").trim();
       lookupKeys.push(cleanNum);
       lookupKeys.push(order.orderNumber.trim());
