@@ -184,7 +184,8 @@ export async function POST(req: Request) {
 //  Update order (stage / shipping advance / courier / prices / status)
 // ------------------------------------------------------------
 const patchSchema = z.object({
-  id: z.string().min(1),
+  id: z.string().min(1).optional(),
+  ids: z.array(z.string().min(1)).optional(),
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
   customerCity: z.string().optional(),
@@ -209,6 +210,8 @@ const patchSchema = z.object({
   labelColor: z.string().optional(),
   archived: z.boolean().optional(),
   cancelled: z.boolean().optional(),
+}).refine((data) => !!data.id || (Array.isArray(data.ids) && data.ids.length > 0), {
+  message: "Either id or ids must be provided",
 });
 
 export async function PATCH(req: Request) {
@@ -219,6 +222,7 @@ export async function PATCH(req: Request) {
   }
   const {
     id,
+    ids,
     customerName,
     customerPhone,
     customerCity,
@@ -245,6 +249,32 @@ export async function PATCH(req: Request) {
     cancelled,
   } = parsed.data;
 
+  // Auto-complete slipPrinted and isPacked if handed over
+  const effectiveSlipPrinted = isCourierHanded === true ? (slipPrinted ?? true) : slipPrinted;
+  const effectiveIsPacked = isCourierHanded === true ? (isPacked ?? true) : isPacked;
+
+  // Bulk update logic
+  if (ids && ids.length > 0) {
+    const updateData: any = {};
+    if (effectiveSlipPrinted !== undefined) updateData.slipPrinted = effectiveSlipPrinted;
+    if (effectiveIsPacked !== undefined) updateData.isPacked = effectiveIsPacked;
+    if (isCourierHanded !== undefined) updateData.isCourierHanded = isCourierHanded;
+    if (labelColor !== undefined) updateData.labelColor = labelColor;
+    if (confirmationStatus !== undefined) updateData.confirmationStatus = confirmationStatus;
+    if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+    if (remarks !== undefined) updateData.remarks = remarks;
+    if (deliveryStatus !== undefined) updateData.deliveryStatus = deliveryStatus;
+    if (archived !== undefined) updateData.archived = archived;
+    if (cancelled !== undefined) updateData.cancelled = cancelled;
+
+    await prisma.order.updateMany({
+      where: { id: { in: ids } },
+      data: updateData,
+    });
+
+    return NextResponse.json({ ok: true, count: ids.length });
+  }
+
   const stageData = stage
     ? {
         stage,
@@ -266,6 +296,8 @@ export async function PATCH(req: Request) {
       extraDeliveryData = {
         deliveryStatus: "delivery attempt",
         isCourierHanded: true,
+        slipPrinted: true,
+        isPacked: true,
         cancelled: false,
         archived: false,
       };
@@ -273,6 +305,8 @@ export async function PATCH(req: Request) {
       extraDeliveryData = {
         deliveryStatus: "delivered",
         isCourierHanded: true,
+        slipPrinted: true,
+        isPacked: true,
         cancelled: false,
         archived: false,
       };
@@ -284,7 +318,7 @@ export async function PATCH(req: Request) {
   }
 
   const order = await prisma.order.update({
-    where: { id },
+    where: { id: id! },
     data: {
       ...stageData,
       ...extraDeliveryData,
@@ -302,8 +336,8 @@ export async function PATCH(req: Request) {
       ...(cogs !== undefined ? { cogs } : {}),
       ...(trackingId !== undefined ? { trackingId } : {}),
       ...(trackingUrl !== undefined ? { trackingUrl } : {}),
-      ...(slipPrinted !== undefined ? { slipPrinted } : {}),
-      ...(isPacked !== undefined ? { isPacked } : {}),
+      ...(effectiveSlipPrinted !== undefined ? { slipPrinted: effectiveSlipPrinted } : {}),
+      ...(effectiveIsPacked !== undefined ? { isPacked: effectiveIsPacked } : {}),
       ...(isCourierHanded !== undefined ? { isCourierHanded } : {}),
       ...(remarks !== undefined ? { remarks } : {}),
       ...(specialDetails !== undefined ? { specialDetails } : {}),

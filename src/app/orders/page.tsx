@@ -351,6 +351,9 @@ export default function OrdersPage() {
   const [singleRcSyncing, setSingleRcSyncing] = useState(false);
   const [showRawPayload, setShowRawPayload] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null); // orderId or null
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkColorPickerOpen, setBulkColorPickerOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const load = () =>
     apiGet<{ orders: Order[] }>("/api/orders?limit=300")
@@ -613,6 +616,7 @@ export default function OrdersPage() {
       remarks: edit.remarks || "",
       specialDetails: edit.specialDetails || "",
       deliveryStatus: edit.deliveryStatus || "pending under ATC",
+      slipPrinted: edit.slipPrinted,
       isPacked: edit.isPacked,
       isCourierHanded: edit.isCourierHanded,
       archived: edit.archived,
@@ -630,6 +634,55 @@ export default function OrdersPage() {
     await apiSend("/api/orders", "PATCH", { id, ...patch });
     load();
   }
+
+  async function bulkUpdate(patch: Partial<Order>) {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    setBulkUpdating(true);
+    setOrders((prev) =>
+      prev.map((o) => (selectedIds.has(o.id) ? { ...o, ...patch } : o))
+    );
+    try {
+      await apiSend("/api/orders", "PATCH", { ids, ...patch });
+      await load();
+      setBulkColorPickerOpen(false);
+    } catch (e: any) {
+      alert(`Bulk update failed: ${e?.message || e}`);
+    }
+    setBulkUpdating(false);
+  }
+
+  const bulkToggleSlipPrint = () => {
+    const targetOrders = orders.filter((o) => selectedIds.has(o.id));
+    const allPrinted = targetOrders.length > 0 && targetOrders.every((o) => !!o.slipPrinted);
+    bulkUpdate({ slipPrinted: !allPrinted });
+  };
+
+  const bulkTogglePack = () => {
+    const targetOrders = orders.filter((o) => selectedIds.has(o.id));
+    const allPacked = targetOrders.length > 0 && targetOrders.every((o) => !!o.isPacked);
+    bulkUpdate({ isPacked: !allPacked });
+  };
+
+  const bulkHandover = () => {
+    bulkUpdate({ isCourierHanded: true, slipPrinted: true, isPacked: true });
+  };
+
+  const bulkColorChange = (color: string) => {
+    bulkUpdate({ labelColor: color });
+  };
+
+  const toggleSelectOrder = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   async function setArchived(id: string, archived: boolean) {
     await apiSend("/api/orders", "PATCH", { id, archived, cancelled: archived });
@@ -825,6 +878,29 @@ export default function OrdersPage() {
         }
         return isCancelled(o);
       });
+
+  const allShownSelected = shown.length > 0 && shown.every((o) => selectedIds.has(o.id));
+  const someShownSelected = shown.some((o) => selectedIds.has(o.id));
+
+  const toggleSelectAll = () => {
+    if (allShownSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        shown.forEach((o) => next.delete(o.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        shown.forEach((o) => next.add(o.id));
+        return next;
+      });
+    }
+  };
+
+  const selectedOrders = orders.filter((o) => selectedIds.has(o.id));
+  const allSelectedSlipPrinted = selectedOrders.length > 0 && selectedOrders.every((o) => !!o.slipPrinted);
+  const allSelectedPacked = selectedOrders.length > 0 && selectedOrders.every((o) => !!o.isPacked);
 
   // Dynamic KPI Cards per tab state or global search
   const renderKpiCards = () => {
@@ -1264,6 +1340,8 @@ export default function OrdersPage() {
                 key={t.k}
                 onClick={() => {
                   setTab(t.k);
+                  setSelectedIds(new Set());
+                  setBulkColorPickerOpen(false);
                   if (t.k === "courierHanded") setCourierFilter("all");
                   if (t.k === "rto") setRtoCourierFilter("all");
                 }}
@@ -1344,7 +1422,96 @@ export default function OrdersPage() {
           "Cancelled Orders"
         }
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap bg-panel2 px-2.5 py-1 rounded-pill border border-border">
+                <span className="text-xs font-semibold text-text mr-1">
+                  {selectedIds.size} Selected
+                </span>
+
+                {/* 1. Slip Print */}
+                <button
+                  type="button"
+                  onClick={bulkToggleSlipPrint}
+                  disabled={bulkUpdating}
+                  className="btn-ghost !py-1 !px-2.5 text-xs font-medium inline-flex items-center gap-1 hover:border-text cursor-pointer"
+                  title={allSelectedSlipPrinted ? "Uncheck Slip Print for selected orders" : "Mark Slip Print as completed for selected orders"}
+                >
+                  <Printer className="w-3 h-3" />
+                  <span>{allSelectedSlipPrinted ? "Uncheck Slip" : "Slip Print"}</span>
+                </button>
+
+                {/* 2. Pack */}
+                <button
+                  type="button"
+                  onClick={bulkTogglePack}
+                  disabled={bulkUpdating}
+                  className="btn-ghost !py-1 !px-2.5 text-xs font-medium inline-flex items-center gap-1 hover:border-text cursor-pointer"
+                  title={allSelectedPacked ? "Uncheck Pack for selected orders" : "Mark Pack as completed for selected orders"}
+                >
+                  <Package className="w-3 h-3" />
+                  <span>{allSelectedPacked ? "Uncheck Pack" : "Pack"}</span>
+                </button>
+
+                {/* 2. Handover */}
+                <button
+                  type="button"
+                  onClick={bulkHandover}
+                  disabled={bulkUpdating}
+                  className="btn !py-1 !px-2.5 text-xs font-medium inline-flex items-center gap-1 bg-pistachio text-black hover:opacity-90 transition border-0 cursor-pointer"
+                  title="Handover selected orders to courier"
+                >
+                  <Truck className="w-3 h-3 stroke-[2]" />
+                  <span>Handover</span>
+                </button>
+
+                {/* 3. Color Change */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setBulkColorPickerOpen(!bulkColorPickerOpen)}
+                    disabled={bulkUpdating}
+                    className="btn-ghost !py-1 !px-2.5 text-xs font-medium inline-flex items-center gap-1 hover:border-text cursor-pointer"
+                    title="Change label color for selected orders"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full border border-border bg-gradient-to-tr from-rose-500 via-amber-400 to-emerald-400 inline-block" />
+                    <span>Color Change</span>
+                  </button>
+
+                  {bulkColorPickerOpen && (
+                    <div className="absolute right-0 top-8 z-50 bg-panel border border-border rounded-shopify-lg shadow-modal p-2 flex gap-1.5 flex-wrap w-[140px]">
+                      {COLOR_OPTIONS.map((c) => (
+                        <button
+                          key={c.value}
+                          title={c.label}
+                          onClick={() => {
+                            bulkColorChange(c.value);
+                          }}
+                          className="w-6 h-6 rounded-pill border transition hover:scale-110 border-border opacity-80 hover:opacity-100 cursor-pointer"
+                          style={{ backgroundColor: c.value === "transparent" ? "transparent" : c.value }}
+                        >
+                          {c.value === "transparent" && <span className="text-[9px] text-muted leading-none">✕</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Deselect */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedIds(new Set());
+                    setBulkColorPickerOpen(false);
+                  }}
+                  className="text-muted hover:text-text text-xs p-1 ml-0.5 cursor-pointer"
+                  title="Deselect all"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             <button className="btn-primary flex items-center gap-1 text-xs !py-1.5 !px-3" onClick={() => setShowForm(!showForm)}>
               <span>{showForm ? "✕ Close" : "+ Naya Order"}</span>
             </button>
@@ -1437,10 +1604,22 @@ export default function OrdersPage() {
                 "No cancelled orders found."
           } />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[160px]">
             <table className="w-full text-xs sm:text-sm text-left border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-20 bg-panel2 shadow-sm">
                 <tr className="bg-panel2 text-muted uppercase font-medium text-eyebrow border-b border-border">
+                  <th className="py-3 px-2 text-center whitespace-nowrap w-8">
+                    <input
+                      type="checkbox"
+                      checked={allShownSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = !allShownSelected && someShownSelected;
+                      }}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border border-border bg-panel2 text-text focus:ring-text accent-text cursor-pointer"
+                      title="Select all orders"
+                    />
+                  </th>
                   <th className="py-3 px-1.5 text-center whitespace-nowrap min-w-[32px]">#</th>
                   <th className="py-3 px-1 text-center whitespace-nowrap"></th>
                   <th className="py-3 px-1.5 whitespace-nowrap">Date</th>
@@ -1479,9 +1658,20 @@ export default function OrdersPage() {
                   return (
                     <tr
                       key={o.id}
-                      className="hover:bg-panel2/40 transition-colors"
+                      className={`hover:bg-panel2/40 transition-colors ${selectedIds.has(o.id) ? "bg-aloe/10" : ""}`}
                       style={rowColor ? { backgroundColor: `${rowColor}18` } : undefined}
                     >
+                      {/* Bulk Select Checkbox */}
+                      <td className="py-2.5 px-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(o.id)}
+                          onChange={() => toggleSelectOrder(o.id)}
+                          className="h-4 w-4 rounded border border-border bg-panel2 text-text focus:ring-text accent-text cursor-pointer"
+                          title="Select order"
+                        />
+                      </td>
+
                       {/* Numbering */}
                       <td className="py-2.5 px-1.5 text-center text-muted font-mono font-medium text-xs">
                         {index + 1}
@@ -1496,26 +1686,29 @@ export default function OrdersPage() {
                           title="Set order color"
                         />
                         {colorPickerOpen === o.id && (
-                          <div className="absolute left-6 top-1 z-50 bg-panel border border-border rounded-shopify-lg shadow-modal p-2 flex gap-1.5 flex-wrap w-[140px]">
-                            {COLOR_OPTIONS.map((c) => (
-                              <button
-                                key={c.value}
-                                title={c.label}
-                                onClick={() => {
-                                  updateField(o.id, { labelColor: c.value } as Partial<Order>);
-                                  setColorPickerOpen(null);
-                                }}
-                                className={`w-6 h-6 rounded-pill border transition hover:scale-110 ${
-                                  (o.labelColor || "transparent") === c.value
-                                    ? "ring-2 ring-text border-text"
-                                    : "border-border opacity-80 hover:opacity-100"
-                                }`}
-                                style={{ backgroundColor: c.value === "transparent" ? "transparent" : c.value }}
-                              >
-                                {c.value === "transparent" && <span className="text-[9px] text-muted leading-none">✕</span>}
-                              </button>
-                            ))}
-                          </div>
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setColorPickerOpen(null)} />
+                            <div className={`absolute left-6 ${index > 0 && index >= shown.length - 2 ? "bottom-1" : "top-1"} z-50 bg-panel border border-border rounded-shopify-lg shadow-modal p-2 flex gap-1.5 flex-wrap w-[140px]`}>
+                              {COLOR_OPTIONS.map((c) => (
+                                <button
+                                  key={c.value}
+                                  title={c.label}
+                                  onClick={() => {
+                                    updateField(o.id, { labelColor: c.value } as Partial<Order>);
+                                    setColorPickerOpen(null);
+                                  }}
+                                  className={`w-6 h-6 rounded-pill border transition hover:scale-110 ${
+                                    (o.labelColor || "transparent") === c.value
+                                      ? "ring-2 ring-text border-text"
+                                      : "border-border opacity-80 hover:opacity-100"
+                                  }`}
+                                  style={{ backgroundColor: c.value === "transparent" ? "transparent" : c.value }}
+                                >
+                                  {c.value === "transparent" && <span className="text-[9px] text-muted leading-none">✕</span>}
+                                </button>
+                              ))}
+                            </div>
+                          </>
                         )}
                       </td>
                       {/* 1. Date */}
@@ -1621,8 +1814,20 @@ export default function OrdersPage() {
                       {/* 11. Courier Hand */}
                       <td className="py-2.5 px-1 text-center">
                         <button
-                          onClick={() => updateField(o.id, { isCourierHanded: !o.isCourierHanded })}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill text-[11px] font-medium border-0 transition ${
+                          onClick={() => {
+                            if (!o.isCourierHanded) {
+                              updateField(o.id, {
+                                isCourierHanded: true,
+                                slipPrinted: true,
+                                isPacked: true,
+                              });
+                            } else {
+                              updateField(o.id, {
+                                isCourierHanded: false,
+                              });
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill text-[11px] font-medium border-0 transition cursor-pointer ${
                             o.isCourierHanded
                               ? "bg-pistachio text-black"
                               : "bg-panel2 text-muted hover:text-text border border-border"
@@ -1933,7 +2138,18 @@ export default function OrdersPage() {
                   <span>Order Packed</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={!!edit.isCourierHanded} onChange={(e) => setEdit({ ...edit, isCourierHanded: e.target.checked })} />
+                  <input
+                    type="checkbox"
+                    checked={!!edit.isCourierHanded}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEdit({
+                        ...edit,
+                        isCourierHanded: checked,
+                        ...(checked ? { slipPrinted: true, isPacked: true } : {}),
+                      });
+                    }}
+                  />
                   <span>Delivered to Courier</span>
                 </label>
               </div>
